@@ -1,0 +1,18 @@
+.DS_Store
+node_modules/
+
+# Run outputs — never committed
+local-data/
+*.log
+
+# Secrets — keys, tokens, ROE configs with real targets
+.env
+.env.*
+config/roe.*.yaml
+!config/roe.example.yaml
+*.key
+*.pem
+
+# Editor
+.vscode/
+.idea/

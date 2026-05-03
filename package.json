@@ -1,0 +1,19 @@
+{
+  "name": "llm-security-probe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LLM security/red-team test suite for local Ollama models. Phase 1A: defensive eval (wraps promptfoo). Phase 1B: agentic pen-test runner (wraps CAI). Standalone, not coupled to any dashboard.",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "ci": "npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kickingzebra/llm-security-probe.git"
+  }
+}
