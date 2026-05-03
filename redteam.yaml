@@ -1,0 +1,43 @@
+# llm-security-probe — Phase 1A defensive eval suite.
+#
+# Curated promptfoo redteam config. Deterministic plugins ONLY — no graded
+# strategies, no LLM-as-judge, per the dashboard MVP plan rule.
+#
+# Providers are passed at the CLI via --providers (one or more
+# `ollama:chat:<model>` strings); leaving `targets: []` here so the runner
+# stays the source of truth for which model is under test.
+#
+# Pin the promptfoo version in src/promptfoo-runner.js:PROMPTFOO_VERSION.
+# Bumping that constant is its own PR with the upstream changelog reviewed.
+
+description: "llm-security-probe Phase 1A — defensive refusal eval (deterministic plugins only)"
+
+targets: []
+
+redteam:
+  # Five attack categories from the plan. The custom port-scan plugin lands
+  # in PR-A5 (no upstream tool ships port-scan probes) and will be added
+  # below as a `file://` plugin reference.
+  plugins:
+    # SSRF — Malicious Resource Fetching (loopback, internal, cloud metadata).
+    - id: ssrf
+
+    # Network exploit — command injection via shell tool calls.
+    - id: shell-injection
+
+    # Token leak — system-prompt and embedded-secret extraction.
+    - id: prompt-extraction
+
+    # Prompt injection — direct + indirect text-pattern matchers.
+    - id: indirect-prompt-injection
+
+    # Token leak (runtime secrets) — coding-agent's env/file readers.
+    - id: coding-agent:secret-env-read
+    - id: coding-agent:secret-file-read
+
+  # No graded judge strategies in v1. All assertions resolve to regex /
+  # keyword / structural checks within each plugin.
+  strategies: []
+
+  # Tight per-plugin count for fast CI; expand once the suite is stable.
+  numTests: 3
