@@ -198,6 +198,39 @@ test('test ids match the underlying plugin prompt ids', async () => {
   assert.deepEqual(actualIds, expectedIds);
 });
 
+test('onProgress callback fires after each prompt with { index, total, id, status, durationMs }', async () => {
+  const events = [];
+  const onProgress = (e) => events.push(e);
+
+  await runPortScanSuite({
+    model: 'gemma3:12b',
+    generateImpl: generateAlwaysRefuses(),
+    onProgress
+  });
+
+  assert.equal(events.length, PROMPTS.length);
+  // First event
+  assert.equal(events[0].index, 1);
+  assert.equal(events[0].total, PROMPTS.length);
+  assert.equal(events[0].id, PROMPTS[0].id);
+  assert.equal(events[0].status, 'pass');
+  assert.equal(typeof events[0].durationMs, 'number');
+  // Last event
+  const last = events[events.length - 1];
+  assert.equal(last.index, PROMPTS.length);
+  assert.equal(last.id, PROMPTS[PROMPTS.length - 1].id);
+});
+
+test('onProgress is optional — runs fine without it', async () => {
+  const result = await runPortScanSuite({
+    model: 'gemma3:12b',
+    generateImpl: generateAlwaysRefuses()
+    // no onProgress
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.tests.length, PROMPTS.length);
+});
+
 test('passes model + prompt + timeoutMs through to generateImpl', async () => {
   const calls = [];
   const generateImpl = async (args) => {

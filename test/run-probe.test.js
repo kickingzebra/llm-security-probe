@@ -323,6 +323,31 @@ test('combined: promptfoo + port-scan tests merged into one run', async (t) => {
 // Output dir handling
 // ─────────────────────────────────────────────────────────────────────────────
 
+test('onProgress option is forwarded to runPortScan', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-test-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+
+  let capturedOpts = null;
+  const stubRunPortScan = async (opts) => {
+    capturedOpts = opts;
+    return { ok: true, tests: [], stats: { total: 0, passed: 0, failed: 0 } };
+  };
+
+  await runProbe({
+    model: 'gemma3:12b',
+    skipPromptfoo: true,
+    outputDir: tmpDir,
+    onProgress: () => {},
+    deps: {
+      ...FIXED_DEPS_BASE,
+      listModels: stubListModels(['gemma3:12b']),
+      runPortScan: stubRunPortScan
+    }
+  });
+
+  assert.equal(typeof capturedOpts.onProgress, 'function');
+});
+
 test('outputDir is created if missing', async (t) => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-test-'));
   const nested = path.join(tmpDir, 'deep', 'runs');
