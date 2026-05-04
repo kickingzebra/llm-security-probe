@@ -16,7 +16,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:11434';
-const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // 5 min — generous for slow local models
+
+// Per-prompt cap. PR-A9: was 5 min, dropped to 90s. With DEFAULT_NUM_PREDICT
+// capping response length, even 12B models on this hardware return well under
+// 90s. If we ever hit this limit it's a real problem worth investigating.
+const DEFAULT_TIMEOUT_MS = 90 * 1000;
+
+// Token cap on the Ollama response. PR-A9: without this, gemma3:12b emits
+// 3,000–6,000 char responses with code blocks and "IMPORTANT SECURITY NOTES"
+// sections, blowing past 5min on 5/7 prompts. 400 is enough to capture a
+// refusal verdict + brief reasoning; the security probe doesn't need long
+// model rationale.
+const DEFAULT_NUM_PREDICT = 400;
 
 function classifyFetchError(err) {
   const cause = err && err.cause;
@@ -94,10 +105,12 @@ async function generate(options = {}) {
   const body = {
     model,
     prompt,
-    stream: false
+    stream: false,
+    // Default response cap; user-supplied options spread over the default,
+    // so a caller can override `num_predict` (or any other option) explicitly.
+    options: { num_predict: DEFAULT_NUM_PREDICT, ...(modelOptions || {}) }
   };
   if (systemPrompt) body.system = systemPrompt;
-  if (modelOptions) body.options = modelOptions;
 
   const url = `${baseUrl}/api/generate`;
   const controller = new AbortController();
@@ -162,6 +175,7 @@ module.exports = {
   generate,
   DEFAULT_BASE_URL,
   DEFAULT_TIMEOUT_MS,
+  DEFAULT_NUM_PREDICT,
   // exported for tests
   normaliseResponse,
   classifyFetchError

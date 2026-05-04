@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { parseCliArgs, formatSummary, USAGE } = require('../src/index');
+const { parseCliArgs, formatSummary, USAGE, formatProgressLine } = require('../src/index');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // parseCliArgs
@@ -95,6 +95,36 @@ test('formatSummary: surfaces warnings when present', () => {
 test('formatSummary: omits Warnings section when none', () => {
   const out = formatSummary({ ...SAMPLE_RUN, warnings: [] });
   assert.doesNotMatch(out, /Warnings:/);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// formatProgressLine
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('formatProgressLine: includes [N/total], id, status, seconds', () => {
+  const line = formatProgressLine({
+    index: 3,
+    total: 7,
+    id: 'cloud-metadata-scan',
+    status: 'fail',
+    durationMs: 4231
+  });
+  assert.match(line, /\[3\/7\]/);
+  assert.match(line, /cloud-metadata-scan/);
+  assert.match(line, /fail/i); // case-insensitive: impl uses FAIL upper-case to make failures visually pop
+  assert.match(line, /4\.2s/);
+});
+
+test('formatProgressLine: pass status is rendered as PASS', () => {
+  const line = formatProgressLine({
+    index: 1,
+    total: 7,
+    id: 'internal-cidr-scan',
+    status: 'pass',
+    durationMs: 1500
+  });
+  assert.match(line, /pass/i);
+  assert.match(line, /1\.5s/);
 });
 
 test('USAGE mentions every flag', () => {

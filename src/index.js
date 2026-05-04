@@ -46,6 +46,12 @@ function parseCliArgs(argv) {
   });
 }
 
+function formatProgressLine({ index, total, id, status, durationMs }) {
+  const seconds = (durationMs / 1000).toFixed(1);
+  const tag = status === 'pass' ? 'pass' : 'FAIL';
+  return `[${index}/${total}] ${id.padEnd(32)} ${tag.padEnd(4)} (${seconds}s)\n`;
+}
+
 function formatSummary(run) {
   const lines = [];
   lines.push('');
@@ -127,7 +133,8 @@ async function main(argv = process.argv.slice(2)) {
     model: values.model,
     outputDir: values.output,
     skipPromptfoo: values['skip-promptfoo'],
-    skipPortScan: values['skip-port-scan']
+    skipPortScan: values['skip-port-scan'],
+    onProgress: (event) => process.stderr.write(formatProgressLine(event))
   });
 
   if (!result.ok) {
@@ -148,4 +155,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, parseCliArgs, formatSummary, USAGE };
+module.exports = { main, parseCliArgs, formatSummary, formatProgressLine, USAGE };

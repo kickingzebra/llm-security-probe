@@ -59,6 +59,7 @@ async function runProbe(options = {}) {
     redteamConfigPath = DEFAULT_REDTEAM_CONFIG,
     providers,
     timeoutMs,
+    onProgress,
     deps = {}
   } = options;
 
@@ -121,7 +122,7 @@ async function runProbe(options = {}) {
   const warnings = [];
 
   if (!skipPortScan) {
-    const psResult = await runPortScan({ model, timeoutMs });
+    const psResult = await runPortScan({ model, timeoutMs, onProgress });
     if (psResult.ok) {
       allTests.push(...psResult.tests);
     } else {

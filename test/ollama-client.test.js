@@ -2,7 +2,12 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { generate, DEFAULT_BASE_URL } = require('../src/ollama-client');
+const {
+  generate,
+  DEFAULT_BASE_URL,
+  DEFAULT_TIMEOUT_MS,
+  DEFAULT_NUM_PREDICT
+} = require('../src/ollama-client');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test helpers
@@ -69,6 +74,70 @@ const SAMPLE_RESPONSE = {
 
 test('DEFAULT_BASE_URL matches the local Ollama default', () => {
   assert.equal(DEFAULT_BASE_URL, 'http://127.0.0.1:11434');
+});
+
+test('DEFAULT_TIMEOUT_MS is 90s (PR-A9 perf cap, was 5min)', () => {
+  assert.equal(DEFAULT_TIMEOUT_MS, 90_000);
+});
+
+test('DEFAULT_NUM_PREDICT is 400 (PR-A9 response-length cap)', () => {
+  assert.equal(DEFAULT_NUM_PREDICT, 400);
+});
+
+test('default request body sets options.num_predict=400 when no user options', async () => {
+  let capturedBody = null;
+  const fetchImpl = async (_url, options) => {
+    capturedBody = JSON.parse(options.body);
+    return {
+      ok: true,
+      status: 200,
+      json: async () => SAMPLE_RESPONSE,
+      text: async () => JSON.stringify(SAMPLE_RESPONSE)
+    };
+  };
+  await generate({ model: 'gemma3:12b', prompt: 'Hi', fetchImpl });
+  assert.equal(capturedBody.options.num_predict, 400);
+});
+
+test('user-provided num_predict overrides the default cap', async () => {
+  let capturedBody = null;
+  const fetchImpl = async (_url, options) => {
+    capturedBody = JSON.parse(options.body);
+    return {
+      ok: true,
+      status: 200,
+      json: async () => SAMPLE_RESPONSE,
+      text: async () => JSON.stringify(SAMPLE_RESPONSE)
+    };
+  };
+  await generate({
+    model: 'gemma3:12b',
+    prompt: 'Hi',
+    options: { num_predict: 50 },
+    fetchImpl
+  });
+  assert.equal(capturedBody.options.num_predict, 50);
+});
+
+test('default num_predict merges with other user options (e.g. temperature)', async () => {
+  let capturedBody = null;
+  const fetchImpl = async (_url, options) => {
+    capturedBody = JSON.parse(options.body);
+    return {
+      ok: true,
+      status: 200,
+      json: async () => SAMPLE_RESPONSE,
+      text: async () => JSON.stringify(SAMPLE_RESPONSE)
+    };
+  };
+  await generate({
+    model: 'gemma3:12b',
+    prompt: 'Hi',
+    options: { temperature: 0.0 },
+    fetchImpl
+  });
+  assert.equal(capturedBody.options.num_predict, 400);
+  assert.equal(capturedBody.options.temperature, 0.0);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

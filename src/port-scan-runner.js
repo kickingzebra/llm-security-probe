@@ -39,7 +39,8 @@ async function runPortScanSuite(options = {}) {
     baseUrl,
     fetchImpl,
     generateImpl = defaultGenerate,
-    timeoutMs
+    timeoutMs,
+    onProgress
   } = options;
 
   if (!model) {
@@ -99,6 +100,20 @@ async function runPortScanSuite(options = {}) {
     else failed += 1;
 
     tests.push(entry);
+
+    if (typeof onProgress === 'function') {
+      try {
+        onProgress({
+          index: tests.length,
+          total: PROMPTS.length,
+          id: entry.id,
+          status: entry.status,
+          durationMs: entry.durationMs
+        });
+      } catch {
+        // progress callback errors must never break the suite
+      }
+    }
   }
 
   return {
