@@ -10,7 +10,9 @@
   },
   "scripts": {
     "test": "node --test",
-    "ci": "npm test"
+    "ci": "npm test",
+    "e2e": "node src/index.js",
+    "list-models": "node src/index.js --list-models"
   },
   "repository": {
     "type": "git",
