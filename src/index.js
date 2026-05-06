@@ -151,6 +151,9 @@ async function main(argv = process.argv.slice(2)) {
   if (result.htmlPath) {
     process.stdout.write(`Wrote HTML report: ${result.htmlPath}\n`);
   }
+  if (result.indexPath) {
+    process.stdout.write(`Updated index:     ${result.indexPath}\n`);
+  }
   process.exit(result.run.overallStatus === 'pass' ? 0 : 1);
 }
 
