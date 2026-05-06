@@ -17,6 +17,7 @@ const { listInstalledModels } = require('./ollama-models');
 const { runPortScanSuite } = require('./port-scan-runner');
 const { runPromptfoo } = require('./promptfoo-runner');
 const { normalise, buildSummary, PHASE } = require('./normaliser');
+const { renderRunReport } = require('./report-renderer');
 
 const DEFAULT_OUTPUT_DIR = 'local-data/runs';
 const DEFAULT_REDTEAM_CONFIG = 'redteam.yaml';
@@ -56,6 +57,7 @@ async function runProbe(options = {}) {
     outputDir = DEFAULT_OUTPUT_DIR,
     skipPromptfoo = false,
     skipPortScan = false,
+    htmlReport = true,
     redteamConfigPath = DEFAULT_REDTEAM_CONFIG,
     providers,
     timeoutMs,
@@ -197,7 +199,13 @@ async function runProbe(options = {}) {
   const outputPath = path.join(outputDir, `${runId}.json`);
   await writeFile(outputPath, `${JSON.stringify(run, null, 2)}\n`, 'utf8');
 
-  return { ok: true, run, outputPath };
+  let htmlPath;
+  if (htmlReport) {
+    htmlPath = path.join(outputDir, `${runId}.html`);
+    await writeFile(htmlPath, renderRunReport(run), 'utf8');
+  }
+
+  return { ok: true, run, outputPath, ...(htmlPath ? { htmlPath } : {}) };
 }
 
 module.exports = {
