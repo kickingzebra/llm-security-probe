@@ -7,6 +7,7 @@ const path = require('node:path');
 
 const {
   renderRunReport,
+  renderIndex,
   escapeHtml
 } = require('../src/report-renderer');
 
@@ -216,4 +217,54 @@ test('renderRunReport: no external <link> or <script src> dependencies', () => {
   const html = renderRunReport(SAMPLE_RUN);
   assert.ok(!/<link[^>]+href/.test(html), 'no external <link> allowed');
   assert.ok(!/<script[^>]+src=/.test(html), 'no external <script src=> allowed');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// renderIndex — aggregate across multiple runs
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('renderIndex: empty array produces a valid minimal page', () => {
+  const html = renderIndex([]);
+  assert.match(html, /^<!DOCTYPE html>/);
+  assert.match(html, /<\/html>\s*$/);
+  assert.match(html, /no runs|empty|0 runs/i);
+});
+
+test('renderIndex: HTML5 doc with title and inline CSS', () => {
+  const html = renderIndex([SAMPLE_RUN]);
+  assert.match(html, /^<!DOCTYPE html>/);
+  assert.match(html, /<title>[^<]*llm-security-probe[^<]*<\/title>/i);
+  assert.match(html, /<style\b[^>]*>[\s\S]+<\/style>/);
+});
+
+test('renderIndex: each run rendered as a row with model, timestamp, status, refusal rate', () => {
+  const r1 = { ...SAMPLE_RUN, runId: 'run_aaa', model: 'gemma3:12b' };
+  const r2 = { ...SAMPLE_RUN, runId: 'run_bbb', model: 'qwen3:8b' };
+  const html = renderIndex([r1, r2]);
+
+  assert.match(html, /run_aaa/);
+  assert.match(html, /run_bbb/);
+  assert.match(html, /gemma3:12b/);
+  assert.match(html, /qwen3:8b/);
+});
+
+test('renderIndex: each row links to the corresponding .html file', () => {
+  const r = { ...SAMPLE_RUN, runId: 'run_link_test' };
+  const html = renderIndex([r]);
+  assert.match(html, /href="run_link_test\.html"/);
+});
+
+test('renderIndex: status badge class matches overallStatus', () => {
+  const passing = { ...SAMPLE_RUN, runId: 'r-pass', overallStatus: 'pass' };
+  const failing = { ...SAMPLE_RUN, runId: 'r-fail', overallStatus: 'fail' };
+  const html = renderIndex([passing, failing]);
+  assert.match(html, /badge-pass/);
+  assert.match(html, /badge-fail/);
+});
+
+test('renderIndex: escapes HTML in model name (XSS guard)', () => {
+  const xss = { ...SAMPLE_RUN, runId: 'r-xss', model: '<script>alert(1)</script>' };
+  const html = renderIndex([xss]);
+  assert.ok(!/<script>alert\(1\)<\/script>/.test(html));
+  assert.match(html, /&lt;script&gt;/);
 });

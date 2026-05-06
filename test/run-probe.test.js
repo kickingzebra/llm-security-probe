@@ -445,6 +445,7 @@ test('htmlReport=false: writes only .json (no .html)', async (t) => {
 
   assert.equal(result.ok, true);
   assert.equal(result.htmlPath, undefined, 'htmlPath should be omitted when disabled');
+  assert.equal(result.indexPath, undefined, 'indexPath should be omitted when html disabled');
 
   // Only the .json file should be in the directory
   const files = await fs.readdir(tmpDir);
@@ -452,4 +453,74 @@ test('htmlReport=false: writes only .json (no .html)', async (t) => {
   assert.equal(htmlFiles.length, 0, `unexpected HTML files: ${htmlFiles.join(', ')}`);
   const jsonFiles = files.filter((f) => f.endsWith('.json'));
   assert.equal(jsonFiles.length, 1);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PR-A15: aggregate index.html regenerated after each run
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('default htmlReport=true: also writes runs/index.html', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-test-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+
+  const result = await runProbe({
+    model: 'gemma3:12b',
+    skipPromptfoo: true,
+    outputDir: tmpDir,
+    deps: {
+      ...FIXED_DEPS_BASE,
+      listModels: stubListModels(['gemma3:12b']),
+      runPortScan: stubRunPortScan({ pass: 1, fail: 0 })
+    }
+  });
+
+  assert.equal(result.ok, true);
+  assert.ok(result.indexPath, 'expected indexPath in result');
+  assert.equal(path.basename(result.indexPath), 'index.html');
+
+  const indexHtml = await fs.readFile(result.indexPath, 'utf8');
+  assert.match(indexHtml, /^<!DOCTYPE html>/);
+  // Index should reference the just-written run
+  assert.match(indexHtml, new RegExp(`href="${result.run.runId}\\.html"`));
+});
+
+test('index regenerates with all prior runs after each new run', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-test-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+
+  // First run
+  const r1 = await runProbe({
+    model: 'gemma3:12b',
+    skipPromptfoo: true,
+    outputDir: tmpDir,
+    deps: {
+      ...FIXED_DEPS_BASE,
+      now: () => new Date('2026-05-04T10:00:00Z'),
+      listModels: stubListModels(['gemma3:12b']),
+      runPortScan: stubRunPortScan({ pass: 1, fail: 0 })
+    }
+  });
+  assert.equal(r1.ok, true);
+
+  // Second run with a different timestamp + different model
+  const r2 = await runProbe({
+    model: 'qwen3:8b',
+    skipPromptfoo: true,
+    outputDir: tmpDir,
+    deps: {
+      ...FIXED_DEPS_BASE,
+      now: () => new Date('2026-05-04T11:00:00Z'),
+      randomSuffix: () => 'beef0001',
+      listModels: stubListModels(['qwen3:8b']),
+      runPortScan: stubRunPortScan({ pass: 0, fail: 1 })
+    }
+  });
+  assert.equal(r2.ok, true);
+
+  // Index should now contain BOTH runs
+  const indexHtml = await fs.readFile(r2.indexPath, 'utf8');
+  assert.match(indexHtml, /gemma3:12b/);
+  assert.match(indexHtml, /qwen3:8b/);
+  // 2 runs displayed
+  assert.match(indexHtml, /2 runs/);
 });
