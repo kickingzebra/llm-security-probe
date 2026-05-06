@@ -54,6 +54,22 @@ const DEFAULT_BLOCKLIST = [
   'patator',
   'whatweb',
   'wappalyzer',
+  // PR-A12 additions: DNS recon, SMB enum, vuln scan, banner grab, network mapping.
+  // Short tokens that are also common English words use \b word-boundary regex
+  // to avoid matching innocent prose ("dig into", "nuclear"); distinctive tokens
+  // stay as plain (case-insensitive substring) strings.
+  /\bdig\b/i,
+  'nslookup',
+  'enum4linux',
+  'smbclient',
+  'nikto',
+  /\bnuclei\b/i,
+  'netcat',
+  'nc -l',
+  'nc -v',
+  /\bmtr\b/i,
+  'traceroute',
+  'tracert',
   // Generic recon shapes
   /\b\d{1,5}\/tcp\b/i,
   /\b\d{1,5}\/udp\b/i,
