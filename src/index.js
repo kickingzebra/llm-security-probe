@@ -23,6 +23,7 @@ Usage:
   node src/index.js --model <name>            run the full probe (port-scan + promptfoo)
   node src/index.js --model <name> --skip-promptfoo
   node src/index.js --model <name> --skip-port-scan
+  node src/index.js --model <name> --skip-html-report
   node src/index.js --model <name> --output <dir>
   node src/index.js --list-models             list installed Ollama models, exit
   node src/index.js --help                    print this message
@@ -39,6 +40,7 @@ function parseCliArgs(argv) {
       output: { type: 'string', default: DEFAULT_OUTPUT_DIR },
       'skip-promptfoo': { type: 'boolean', default: false },
       'skip-port-scan': { type: 'boolean', default: false },
+      'skip-html-report': { type: 'boolean', default: false },
       'list-models': { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false }
     },
@@ -134,6 +136,7 @@ async function main(argv = process.argv.slice(2)) {
     outputDir: values.output,
     skipPromptfoo: values['skip-promptfoo'],
     skipPortScan: values['skip-port-scan'],
+    htmlReport: !values['skip-html-report'],
     onProgress: (event) => process.stderr.write(formatProgressLine(event))
   });
 
@@ -145,6 +148,9 @@ async function main(argv = process.argv.slice(2)) {
 
   process.stdout.write(formatSummary(result.run));
   process.stdout.write(`Wrote: ${result.outputPath}\n`);
+  if (result.htmlPath) {
+    process.stdout.write(`Wrote HTML report: ${result.htmlPath}\n`);
+  }
   process.exit(result.run.overallStatus === 'pass' ? 0 : 1);
 }
 

@@ -368,3 +368,88 @@ test('outputDir is created if missing', async (t) => {
   const stat = await fs.stat(result.outputPath);
   assert.ok(stat.isFile());
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PR-A14: HTML report emission alongside JSON
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('default htmlReport=true: writes both .json and .html with matching basenames', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-test-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+
+  const result = await runProbe({
+    model: 'gemma3:12b',
+    skipPromptfoo: true,
+    outputDir: tmpDir,
+    // no htmlReport option — should default to true
+    deps: {
+      ...FIXED_DEPS_BASE,
+      listModels: stubListModels(['gemma3:12b']),
+      runPortScan: stubRunPortScan({ pass: 1, fail: 0 })
+    }
+  });
+
+  assert.equal(result.ok, true);
+  assert.ok(result.htmlPath, 'expected htmlPath in result');
+  // Same basename (just different extension)
+  assert.equal(
+    path.basename(result.outputPath, '.json'),
+    path.basename(result.htmlPath, '.html')
+  );
+  // Both files exist on disk
+  const jsonStat = await fs.stat(result.outputPath);
+  const htmlStat = await fs.stat(result.htmlPath);
+  assert.ok(jsonStat.isFile());
+  assert.ok(htmlStat.isFile());
+});
+
+test('htmlReport=true: emitted HTML is a valid HTML5 document', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-test-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+
+  const result = await runProbe({
+    model: 'gemma3:12b',
+    skipPromptfoo: true,
+    outputDir: tmpDir,
+    deps: {
+      ...FIXED_DEPS_BASE,
+      listModels: stubListModels(['gemma3:12b']),
+      runPortScan: stubRunPortScan({ pass: 1, fail: 1 })
+    }
+  });
+
+  const html = await fs.readFile(result.htmlPath, 'utf8');
+  assert.match(html, /^<!DOCTYPE html>/);
+  assert.match(html, /<\/html>\s*$/);
+  // Should contain the model name
+  assert.match(html, /gemma3:12b/);
+  // Should contain at least one <details> per test
+  assert.match(html, /<details/);
+});
+
+test('htmlReport=false: writes only .json (no .html)', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-test-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+
+  const result = await runProbe({
+    model: 'gemma3:12b',
+    skipPromptfoo: true,
+    outputDir: tmpDir,
+    htmlReport: false,
+    deps: {
+      ...FIXED_DEPS_BASE,
+      listModels: stubListModels(['gemma3:12b']),
+      runPortScan: stubRunPortScan({ pass: 1, fail: 0 })
+    }
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.htmlPath, undefined, 'htmlPath should be omitted when disabled');
+
+  // Only the .json file should be in the directory
+  const files = await fs.readdir(tmpDir);
+  const htmlFiles = files.filter((f) => f.endsWith('.html'));
+  assert.equal(htmlFiles.length, 0, `unexpected HTML files: ${htmlFiles.join(', ')}`);
+  const jsonFiles = files.filter((f) => f.endsWith('.json'));
+  assert.equal(jsonFiles.length, 1);
+});

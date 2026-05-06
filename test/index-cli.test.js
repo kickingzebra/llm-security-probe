@@ -21,6 +21,18 @@ test('parseCliArgs: --output captured; defaults to local-data/runs', () => {
   assert.equal(custom.values.output, '/tmp/runs');
 });
 
+test('parseCliArgs: --skip-html-report defaults to false (HTML emitted by default)', () => {
+  const noFlag = parseCliArgs(['--model', 'gemma3:12b']);
+  assert.equal(noFlag.values['skip-html-report'], false);
+
+  const withFlag = parseCliArgs(['--model', 'gemma3:12b', '--skip-html-report']);
+  assert.equal(withFlag.values['skip-html-report'], true);
+});
+
+test('USAGE mentions --skip-html-report', () => {
+  assert.match(USAGE, /--skip-html-report/);
+});
+
 test('parseCliArgs: --skip-promptfoo and --skip-port-scan are booleans', () => {
   const { values } = parseCliArgs([
     '--model',
