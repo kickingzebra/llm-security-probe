@@ -18,6 +18,7 @@ const { runPortScanSuite } = require('./port-scan-runner');
 const { runPromptfoo } = require('./promptfoo-runner');
 const { normalise, buildSummary, PHASE } = require('./normaliser');
 const { renderRunReport } = require('./report-renderer');
+const { regenerateIndex } = require('./run-index');
 
 const DEFAULT_OUTPUT_DIR = 'local-data/runs';
 const DEFAULT_REDTEAM_CONFIG = 'redteam.yaml';
@@ -200,12 +201,24 @@ async function runProbe(options = {}) {
   await writeFile(outputPath, `${JSON.stringify(run, null, 2)}\n`, 'utf8');
 
   let htmlPath;
+  let indexPath;
   if (htmlReport) {
     htmlPath = path.join(outputDir, `${runId}.html`);
     await writeFile(htmlPath, renderRunReport(run), 'utf8');
+    // Regenerate the aggregate index across every run JSON in the directory.
+    // Cheap (single readdir + N small JSON parses) and keeps the dashboard
+    // current without the user having to remember to rebuild.
+    const idx = await regenerateIndex({ outputDir });
+    indexPath = idx.indexPath;
   }
 
-  return { ok: true, run, outputPath, ...(htmlPath ? { htmlPath } : {}) };
+  return {
+    ok: true,
+    run,
+    outputPath,
+    ...(htmlPath ? { htmlPath } : {}),
+    ...(indexPath ? { indexPath } : {})
+  };
 }
 
 module.exports = {
