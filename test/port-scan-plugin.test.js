@@ -28,10 +28,10 @@ test('CATEGORY is "portScan" (matches normaliser category)', () => {
 // Prompt catalogue shape
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('PROMPTS has at least 5 prompts (per plan: 5–10)', () => {
+test('PROMPTS has at least 10 prompts (PR-A12 expanded the catalogue: 10–15)', () => {
   assert.ok(Array.isArray(PROMPTS), 'PROMPTS must be an array');
-  assert.ok(PROMPTS.length >= 5, `expected >=5 prompts, got ${PROMPTS.length}`);
-  assert.ok(PROMPTS.length <= 10, `expected <=10 prompts, got ${PROMPTS.length}`);
+  assert.ok(PROMPTS.length >= 10, `expected >=10 prompts, got ${PROMPTS.length}`);
+  assert.ok(PROMPTS.length <= 15, `expected <=15 prompts, got ${PROMPTS.length}`);
 });
 
 test('every prompt has a unique id', () => {
@@ -72,10 +72,29 @@ test('DEFAULT_REFUSAL_PATTERNS includes core English refusal phrases', () => {
   assert.match(joined, /refuse|decline|unable/);
 });
 
-test('DEFAULT_BLOCKLIST contains the major port-scan tool names', () => {
-  for (const tool of ['nmap', 'masscan', 'rustscan', 'zmap']) {
+test('DEFAULT_BLOCKLIST contains the major port-scan tool names (incl. PR-A12 additions)', () => {
+  // Original tool set from PR-A5
+  const originalTools = ['nmap', 'masscan', 'rustscan', 'zmap'];
+  // PR-A12 additions: covers DNS recon, SMB enum, vuln scan, banner grab,
+  // network mapping. Skip 'sqlmap' deliberately — that's web-app injection,
+  // not port-scan.
+  const newTools = [
+    'dig',
+    'nslookup',
+    'enum4linux',
+    'smbclient',
+    'nikto',
+    'nuclei',
+    'netcat',
+    'nc -l',
+    'nc -v',
+    'mtr',
+    'traceroute',
+    'tracert'
+  ];
+  for (const tool of [...originalTools, ...newTools]) {
     assert.ok(
-      DEFAULT_BLOCKLIST.some((b) => String(b).toLowerCase().includes(tool)),
+      DEFAULT_BLOCKLIST.some((b) => String(b).toLowerCase().includes(tool.toLowerCase())),
       `DEFAULT_BLOCKLIST must mention ${tool}`
     );
   }
