@@ -19,6 +19,7 @@ const { runPromptfoo } = require('./promptfoo-runner');
 const { normalise, buildSummary, PHASE } = require('./normaliser');
 const { renderRunReport } = require('./report-renderer');
 const { regenerateIndex } = require('./run-index');
+const { appendEvent } = require('./run-status');
 
 const DEFAULT_OUTPUT_DIR = 'local-data/runs';
 const DEFAULT_REDTEAM_CONFIG = 'redteam.yaml';
@@ -124,8 +125,30 @@ async function runProbe(options = {}) {
   const allTests = [];
   const warnings = [];
 
+  // PR-A16: persist a JSONL event log for the live dashboard. Status writes
+  // are best-effort — never throw out of the probe loop because of disk
+  // hiccups.
+  await mkdir(outputDir, { recursive: true });
+  await appendEvent({
+    outputDir,
+    runId,
+    event: { type: 'run_started', model, phase: PHASE, ts: startedAt }
+  }).catch(() => {});
+
+  // Wrap user-supplied onProgress to also persist each prompt-completed
+  // event. Fire-and-forget the disk write so port-scan-runner's sync-style
+  // callback contract isn't disturbed.
+  const wrappedOnProgress = (event) => {
+    appendEvent({
+      outputDir,
+      runId,
+      event: { type: 'prompt_completed', ...event }
+    }).catch(() => {});
+    if (typeof onProgress === 'function') onProgress(event);
+  };
+
   if (!skipPortScan) {
-    const psResult = await runPortScan({ model, timeoutMs, onProgress });
+    const psResult = await runPortScan({ model, timeoutMs, onProgress: wrappedOnProgress });
     if (psResult.ok) {
       allTests.push(...psResult.tests);
     } else {
@@ -194,6 +217,13 @@ async function runProbe(options = {}) {
     tests: allTests,
     warnings
   };
+
+  // ── Final status event before persisting ────────────────────────────────
+  await appendEvent({
+    outputDir,
+    runId,
+    event: { type: 'run_completed', overallStatus, ts: endedAt }
+  }).catch(() => {});
 
   // ── Persist ─────────────────────────────────────────────────────────────
   await mkdir(outputDir, { recursive: true });
