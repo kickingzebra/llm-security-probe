@@ -484,6 +484,82 @@ test('default htmlReport=true: also writes runs/index.html', async (t) => {
   assert.match(indexHtml, new RegExp(`href="${result.run.runId}\\.html"`));
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PR-A16: status events emitted as the run progresses
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('runProbe: writes a JSONL status file at runs/<runId>.status.jsonl', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-test-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+
+  const result = await runProbe({
+    model: 'gemma3:12b',
+    skipPromptfoo: true,
+    outputDir: tmpDir,
+    deps: {
+      ...FIXED_DEPS_BASE,
+      listModels: stubListModels(['gemma3:12b']),
+      runPortScan: stubRunPortScan({ pass: 2, fail: 1 })
+    }
+  });
+
+  const statusFile = path.join(tmpDir, `${result.run.runId}.status.jsonl`);
+  const stat = await fs.stat(statusFile);
+  assert.ok(stat.isFile(), 'status file should exist');
+});
+
+test('runProbe: status file contains run_started → N x prompt_completed → run_completed', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-test-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+
+  const result = await runProbe({
+    model: 'gemma3:12b',
+    skipPromptfoo: true,
+    outputDir: tmpDir,
+    deps: {
+      ...FIXED_DEPS_BASE,
+      listModels: stubListModels(['gemma3:12b']),
+      runPortScan: stubRunPortScan({ pass: 2, fail: 1 })
+    }
+  });
+
+  // Wait briefly for any fire-and-forget status writes from onProgress to flush
+  await new Promise((r) => setTimeout(r, 50));
+
+  const statusFile = path.join(tmpDir, `${result.run.runId}.status.jsonl`);
+  const text = await fs.readFile(statusFile, 'utf8');
+  const events = text.trim().split('\n').map((l) => JSON.parse(l));
+
+  assert.ok(events.length >= 2, `expected at least 2 events, got ${events.length}`);
+  assert.equal(events[0].type, 'run_started');
+  assert.equal(events[0].model, 'gemma3:12b');
+  assert.equal(events[events.length - 1].type, 'run_completed');
+  assert.equal(events[events.length - 1].overallStatus, 'fail');
+});
+
+test('runProbe: status events include a ts field', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-test-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+
+  const result = await runProbe({
+    model: 'gemma3:12b',
+    skipPromptfoo: true,
+    outputDir: tmpDir,
+    deps: {
+      ...FIXED_DEPS_BASE,
+      listModels: stubListModels(['gemma3:12b']),
+      runPortScan: stubRunPortScan({ pass: 1, fail: 0 })
+    }
+  });
+
+  const statusFile = path.join(tmpDir, `${result.run.runId}.status.jsonl`);
+  const text = await fs.readFile(statusFile, 'utf8');
+  const events = text.trim().split('\n').map((l) => JSON.parse(l));
+  for (const e of events) {
+    assert.ok(e.ts, `event missing ts: ${JSON.stringify(e)}`);
+  }
+});
+
 test('index regenerates with all prior runs after each new run', async (t) => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-test-'));
   t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
