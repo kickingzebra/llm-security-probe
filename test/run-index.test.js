@@ -174,6 +174,23 @@ test('regenerateIndex: skips non-run files in directory', async (t) => {
     'non-run_ files should be filtered, not skipped');
 });
 
+test('regenerateIndex: also writes live.html alongside index.html', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-index-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+
+  await writeRun(tmpDir, makeRun({ runId: 'run_2026-05-08T00-00-00Z_aaa' }));
+
+  const result = await regenerateIndex({ outputDir: tmpDir });
+  assert.equal(result.ok, true);
+  assert.ok(result.livePath, 'expected livePath in result');
+  assert.equal(path.basename(result.livePath), 'live.html');
+
+  const liveHtml = await fs.readFile(result.livePath, 'utf8');
+  assert.match(liveHtml, /^<!DOCTYPE html>/);
+  // Should contain the polling client
+  assert.match(liveHtml, /\/api\/runs/);
+});
+
 test('regenerateIndex: missing directory does not throw, creates it', async (t) => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-index-'));
   t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));

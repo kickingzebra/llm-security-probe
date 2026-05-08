@@ -459,6 +459,28 @@ test('htmlReport=false: writes only .json (no .html)', async (t) => {
 // PR-A15: aggregate index.html regenerated after each run
 // ─────────────────────────────────────────────────────────────────────────────
 
+test('default htmlReport=true: also writes runs/live.html', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-test-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+
+  const result = await runProbe({
+    model: 'gemma3:12b',
+    skipPromptfoo: true,
+    outputDir: tmpDir,
+    deps: {
+      ...FIXED_DEPS_BASE,
+      listModels: stubListModels(['gemma3:12b']),
+      runPortScan: stubRunPortScan({ pass: 1, fail: 0 })
+    }
+  });
+
+  assert.equal(result.ok, true);
+  assert.ok(result.livePath, 'expected livePath in result');
+  assert.equal(path.basename(result.livePath), 'live.html');
+  const stat = await fs.stat(result.livePath);
+  assert.ok(stat.isFile());
+});
+
 test('default htmlReport=true: also writes runs/index.html', async (t) => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-test-'));
   t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));

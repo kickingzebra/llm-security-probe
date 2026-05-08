@@ -154,6 +154,9 @@ async function main(argv = process.argv.slice(2)) {
   if (result.indexPath) {
     process.stdout.write(`Updated index:     ${result.indexPath}\n`);
   }
+  if (result.livePath) {
+    process.stdout.write(`Live dashboard:    ${result.livePath}\n`);
+  }
   process.exit(result.run.overallStatus === 'pass' ? 0 : 1);
 }
 

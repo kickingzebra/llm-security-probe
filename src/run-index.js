@@ -12,8 +12,10 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 const { renderIndex } = require('./report-renderer');
+const { renderLivePage } = require('./live-page');
 
 const INDEX_FILENAME = 'index.html';
+const LIVE_FILENAME = 'live.html';
 
 async function safeReadJson(filePath) {
   try {
@@ -85,9 +87,16 @@ async function regenerateIndex({ outputDir }) {
   const indexPath = path.join(outputDir, INDEX_FILENAME);
   await fs.writeFile(indexPath, html, 'utf8');
 
+  // Also write the live-dashboard page. Same content regardless of run state
+  // (it's a polling SPA-lite); we write it alongside index.html so it's
+  // always present in any directory that contains run results.
+  const livePath = path.join(outputDir, LIVE_FILENAME);
+  await fs.writeFile(livePath, renderLivePage(), 'utf8');
+
   return {
     ok: true,
     indexPath,
+    livePath,
     runCount: runs.length,
     skipped
   };
@@ -95,5 +104,6 @@ async function regenerateIndex({ outputDir }) {
 
 module.exports = {
   regenerateIndex,
-  INDEX_FILENAME
+  INDEX_FILENAME,
+  LIVE_FILENAME
 };
