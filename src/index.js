@@ -10,6 +10,7 @@
 //   node src/index.js --model gemma3:12b --skip-promptfoo
 //   node src/index.js --model gemma3:12b --skip-port-scan
 //   node src/index.js --model gemma3:12b --output local-data/runs
+//   node src/index.js --serve --open
 //   node src/index.js --list-models
 //   node src/index.js --help
 // ─────────────────────────────────────────────────────────────────────────────
@@ -17,6 +18,9 @@
 const { parseArgs } = require('node:util');
 const { runProbe, DEFAULT_OUTPUT_DIR } = require('./run-probe');
 const { listInstalledModels } = require('./ollama-models');
+const { startServer, DEFAULT_HOST, DEFAULT_PORT } = require('./server');
+const { regenerateIndex } = require('./run-index');
+const { openBrowser } = require('./open-browser');
 
 const USAGE = `
 Usage:
@@ -25,19 +29,28 @@ Usage:
   node src/index.js --model <name> --skip-port-scan
   node src/index.js --model <name> --skip-html-report
   node src/index.js --model <name> --output <dir>
+  node src/index.js --serve                    start the read-only dashboard server
+  node src/index.js --serve --host <host> --port <n>
+  node src/index.js --serve --open             open /live.html in the local browser
   node src/index.js --list-models             list installed Ollama models, exit
   node src/index.js --help                    print this message
 
 Defaults:
   --output  ${DEFAULT_OUTPUT_DIR}
+  --host    ${DEFAULT_HOST}
+  --port    ${DEFAULT_PORT}
 `;
 
 function parseCliArgs(argv) {
-  return parseArgs({
+  const parsed = parseArgs({
     args: argv,
     options: {
       model: { type: 'string' },
       output: { type: 'string', default: DEFAULT_OUTPUT_DIR },
+      serve: { type: 'boolean', default: false },
+      host: { type: 'string', default: DEFAULT_HOST },
+      port: { type: 'string', default: String(DEFAULT_PORT) },
+      open: { type: 'boolean', default: false },
       'skip-promptfoo': { type: 'boolean', default: false },
       'skip-port-scan': { type: 'boolean', default: false },
       'skip-html-report': { type: 'boolean', default: false },
@@ -46,6 +59,14 @@ function parseCliArgs(argv) {
     },
     allowPositionals: false
   });
+
+  const port = Number(parsed.values.port);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    throw new TypeError('option --port must be an integer between 0 and 65535');
+  }
+  parsed.values.port = port;
+
+  return parsed;
 }
 
 function formatProgressLine({ index, total, id, status, durationMs }) {
@@ -84,80 +105,183 @@ function formatSummary(run) {
   return lines.join('\n');
 }
 
-async function listModelsCmd() {
-  const result = await listInstalledModels();
+function defaultWaitForShutdown() {
+  return new Promise((resolve) => {
+    const signals = ['SIGINT', 'SIGTERM'];
+    let settled = false;
+    const handlers = new Map();
+
+    const finish = (signal) => {
+      if (settled) return;
+      settled = true;
+      for (const [name, handler] of handlers) {
+        process.removeListener(name, handler);
+      }
+      resolve(signal);
+    };
+
+    for (const signal of signals) {
+      const handler = () => finish(signal);
+      handlers.set(signal, handler);
+      process.on(signal, handler);
+    }
+  });
+}
+
+function buildLiveUrl(serverUrl) {
+  return `${serverUrl.replace(/\/+$/, '')}/live.html`;
+}
+
+async function listModelsCmd(deps = {}) {
+  const {
+    listModels = listInstalledModels,
+    writeStdout = (text) => process.stdout.write(text),
+    writeStderr = (text) => process.stderr.write(text),
+    exit = (code) => process.exit(code)
+  } = deps;
+
+  const result = await listModels();
   if (!result.ok) {
-    process.stderr.write(`error: could not reach Ollama: ${result.error.code}\n`);
-    process.exit(2);
+    writeStderr(`error: could not reach Ollama: ${result.error.code}\n`);
+    exit(2);
     return;
   }
   if (result.models.length === 0) {
-    process.stdout.write('(no models installed)\n');
+    writeStdout('(no models installed)\n');
     return;
   }
-  process.stdout.write('Installed Ollama models:\n');
+  writeStdout('Installed Ollama models:\n');
   for (const m of result.models) {
-    process.stdout.write(
-      `  ${m.name}  (${m.parameterSize || '?'} ${m.quantization || ''})\n`
-    );
+    writeStdout(`  ${m.name}  (${m.parameterSize || '?'} ${m.quantization || ''})\n`);
   }
 }
 
-async function main(argv = process.argv.slice(2)) {
+async function serveCmd(values, deps = {}) {
+  const {
+    rebuildIndex = regenerateIndex,
+    startServerImpl = startServer,
+    openBrowserImpl = openBrowser,
+    waitForShutdown = defaultWaitForShutdown,
+    writeStdout = (text) => process.stdout.write(text),
+    writeStderr = (text) => process.stderr.write(text)
+  } = deps;
+
+  const indexResult = await rebuildIndex({ outputDir: values.output });
+  const livePath = indexResult.livePath || `${values.output}/live.html`;
+
+  const server = await startServerImpl({
+    runsDir: values.output,
+    host: values.host,
+    port: values.port
+  });
+  const liveUrl = buildLiveUrl(server.url);
+
+  writeStdout(`Serving runs from: ${values.output}\n`);
+  writeStdout(`Server:            ${server.url}\n`);
+  writeStdout(`Live dashboard:    ${liveUrl}\n`);
+  writeStdout(`Live page file:    ${livePath}\n`);
+  writeStdout('Press Ctrl+C to stop.\n');
+
+  if (values.open) {
+    try {
+      await openBrowserImpl(liveUrl);
+    } catch (err) {
+      writeStderr(`warning: could not open browser: ${err.message || err}\n`);
+    }
+  }
+
+  try {
+    await waitForShutdown();
+  } finally {
+    await server.close();
+  }
+}
+
+async function main(argv = process.argv.slice(2), deps = {}) {
+  const {
+    runProbe: runProbeImpl = runProbe,
+    listModels = listInstalledModels,
+    rebuildIndex = regenerateIndex,
+    startServerImpl = startServer,
+    openBrowserImpl = openBrowser,
+    waitForShutdown = defaultWaitForShutdown,
+    writeStdout = (text) => process.stdout.write(text),
+    writeStderr = (text) => process.stderr.write(text),
+    exit = (code) => process.exit(code)
+  } = deps;
+
   let parsed;
   try {
     parsed = parseCliArgs(argv);
   } catch (err) {
-    process.stderr.write(`error: ${err.message}\n${USAGE}`);
-    process.exit(2);
+    writeStderr(`error: ${err.message}\n${USAGE}`);
+    exit(2);
     return;
   }
 
   const { values } = parsed;
 
   if (values.help) {
-    process.stdout.write(USAGE);
+    writeStdout(USAGE);
     return;
   }
 
   if (values['list-models']) {
-    await listModelsCmd();
+    await listModelsCmd({ listModels, writeStdout, writeStderr, exit });
+    return;
+  }
+
+  if (values.open && !values.serve) {
+    writeStderr(`error: --open requires --serve\n${USAGE}`);
+    exit(2);
+    return;
+  }
+
+  if (values.serve) {
+    await serveCmd(values, {
+      rebuildIndex,
+      startServerImpl,
+      openBrowserImpl,
+      waitForShutdown,
+      writeStdout,
+      writeStderr
+    });
     return;
   }
 
   if (!values.model) {
-    process.stderr.write(`error: --model is required\n${USAGE}`);
-    process.exit(2);
+    writeStderr(`error: --model is required\n${USAGE}`);
+    exit(2);
     return;
   }
 
-  const result = await runProbe({
+  const result = await runProbeImpl({
     model: values.model,
     outputDir: values.output,
     skipPromptfoo: values['skip-promptfoo'],
     skipPortScan: values['skip-port-scan'],
     htmlReport: !values['skip-html-report'],
-    onProgress: (event) => process.stderr.write(formatProgressLine(event))
+    onProgress: (event) => writeStderr(formatProgressLine(event))
   });
 
   if (!result.ok) {
-    process.stderr.write(`error: ${result.error.code}: ${result.error.message}\n`);
-    process.exit(2);
+    writeStderr(`error: ${result.error.code}: ${result.error.message}\n`);
+    exit(2);
     return;
   }
 
-  process.stdout.write(formatSummary(result.run));
-  process.stdout.write(`Wrote: ${result.outputPath}\n`);
+  writeStdout(formatSummary(result.run));
+  writeStdout(`Wrote: ${result.outputPath}\n`);
   if (result.htmlPath) {
-    process.stdout.write(`Wrote HTML report: ${result.htmlPath}\n`);
+    writeStdout(`Wrote HTML report: ${result.htmlPath}\n`);
   }
   if (result.indexPath) {
-    process.stdout.write(`Updated index:     ${result.indexPath}\n`);
+    writeStdout(`Updated index:     ${result.indexPath}\n`);
   }
   if (result.livePath) {
-    process.stdout.write(`Live dashboard:    ${result.livePath}\n`);
+    writeStdout(`Live dashboard:    ${result.livePath}\n`);
   }
-  process.exit(result.run.overallStatus === 'pass' ? 0 : 1);
+  exit(result.run.overallStatus === 'pass' ? 0 : 1);
 }
 
 if (require.main === module) {
@@ -167,4 +291,12 @@ if (require.main === module) {
   });
 }
 
-module.exports = { main, parseCliArgs, formatSummary, formatProgressLine, USAGE };
+module.exports = {
+  main,
+  parseCliArgs,
+  formatSummary,
+  formatProgressLine,
+  USAGE,
+  buildLiveUrl,
+  serveCmd
+};
