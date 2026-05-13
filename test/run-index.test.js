@@ -204,3 +204,24 @@ test('regenerateIndex: missing directory does not throw, creates it', async (t) 
   const stat = await fs.stat(result.indexPath);
   assert.ok(stat.isFile());
 });
+
+test('regenerateIndex: writes log.html alongside index.html and live.html', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-index-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+
+  await writeRun(tmpDir, makeRun({
+    runId: 'run_2026-05-13T10-00-00Z_aaaa',
+    tests: [
+      { id: 'p1', category: 'portScan', status: 'fail', prompt: 'a', replyText: 'b' }
+    ]
+  }));
+
+  const result = await regenerateIndex({ outputDir: tmpDir });
+
+  assert.equal(result.ok, true);
+  assert.ok(result.logPath, 'result must include logPath');
+  const logHtml = await fs.readFile(result.logPath, 'utf8');
+  assert.match(logHtml, /^<!DOCTYPE html>/);
+  // The single test should appear in the log
+  assert.match(logHtml, /p1/);
+});

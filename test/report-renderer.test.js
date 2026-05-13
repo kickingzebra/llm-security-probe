@@ -268,3 +268,9 @@ test('renderIndex: escapes HTML in model name (XSS guard)', () => {
   assert.ok(!/<script>alert\(1\)<\/script>/.test(html));
   assert.match(html, /&lt;script&gt;/);
 });
+
+test('renderIndex: includes a "Probe Log" link/button to log.html', () => {
+  const html = renderIndex([]);
+  assert.match(html, /href="log\.html"/);
+  assert.match(html, /probe log/i);
+});
