@@ -233,15 +233,18 @@ async function runProbe(options = {}) {
   let htmlPath;
   let indexPath;
   let livePath;
+  let logPath;
   if (htmlReport) {
     htmlPath = path.join(outputDir, `${runId}.html`);
     await writeFile(htmlPath, renderRunReport(run), 'utf8');
-    // Regenerate the aggregate index AND live page across every run JSON in
-    // the directory. Cheap (single readdir + N small JSON parses) and keeps
-    // the dashboard current without the user having to remember to rebuild.
+    // Regenerate the aggregate index, live page, and probe log across every
+    // run JSON in the directory. Cheap (single readdir + N small JSON parses)
+    // and keeps the dashboard current without the user having to remember to
+    // rebuild.
     const idx = await regenerateIndex({ outputDir });
     indexPath = idx.indexPath;
     livePath = idx.livePath;
+    logPath = idx.logPath;
   }
 
   return {
@@ -250,7 +253,8 @@ async function runProbe(options = {}) {
     outputPath,
     ...(htmlPath ? { htmlPath } : {}),
     ...(indexPath ? { indexPath } : {}),
-    ...(livePath ? { livePath } : {})
+    ...(livePath ? { livePath } : {}),
+    ...(logPath ? { logPath } : {})
   };
 }
 

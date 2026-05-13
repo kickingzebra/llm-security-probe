@@ -13,9 +13,11 @@ const path = require('node:path');
 
 const { renderIndex } = require('./report-renderer');
 const { renderLivePage } = require('./live-page');
+const { renderLogPage } = require('./log-page');
 
 const INDEX_FILENAME = 'index.html';
 const LIVE_FILENAME = 'live.html';
+const LOG_FILENAME = 'log.html';
 
 async function safeReadJson(filePath) {
   try {
@@ -93,10 +95,16 @@ async function regenerateIndex({ outputDir }) {
   const livePath = path.join(outputDir, LIVE_FILENAME);
   await fs.writeFile(livePath, renderLivePage(), 'utf8');
 
+  // Probe log: chronological per-prompt view across all runs. Reads from the
+  // same `runs` array — no separate aggregate store, no duplication.
+  const logPath = path.join(outputDir, LOG_FILENAME);
+  await fs.writeFile(logPath, renderLogPage(runs), 'utf8');
+
   return {
     ok: true,
     indexPath,
     livePath,
+    logPath,
     runCount: runs.length,
     skipped
   };
@@ -105,5 +113,6 @@ async function regenerateIndex({ outputDir }) {
 module.exports = {
   regenerateIndex,
   INDEX_FILENAME,
-  LIVE_FILENAME
+  LIVE_FILENAME,
+  LOG_FILENAME
 };
