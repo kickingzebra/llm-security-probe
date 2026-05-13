@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { main, parseCliArgs, formatSummary, USAGE, formatProgressLine } = require('../src/index');
+const { main, parseCliArgs, formatSummary, USAGE, formatProgressLine, sweepCmd } = require('../src/index');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // parseCliArgs
@@ -271,4 +271,197 @@ test('main: --open without --serve exits with usage error', async () => {
 
   assert.deepEqual(exitCodes, [2]);
   assert.match(stderr.join(''), /--open requires --serve/);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PR-A20: --sweep multi-model sequential runs
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('parseCliArgs: --sweep parses comma-separated list into a trimmed array', () => {
+  const { values } = parseCliArgs(['--sweep', 'gemma3:12b, llama3.1:8b ,qwen3:8b']);
+  assert.deepEqual(values.sweep, ['gemma3:12b', 'llama3.1:8b', 'qwen3:8b']);
+});
+
+test('parseCliArgs: --sweep with single model becomes a one-element array', () => {
+  const { values } = parseCliArgs(['--sweep', 'gemma3:12b']);
+  assert.deepEqual(values.sweep, ['gemma3:12b']);
+});
+
+test('parseCliArgs: --sweep with empty or whitespace-only value throws', () => {
+  assert.throws(() => parseCliArgs(['--sweep', '']), /--sweep/i);
+  assert.throws(() => parseCliArgs(['--sweep', '   ']), /--sweep/i);
+  assert.throws(() => parseCliArgs(['--sweep', ', ,  ,']), /--sweep/i);
+});
+
+test('parseCliArgs: --sweep absent leaves values.sweep undefined', () => {
+  const { values } = parseCliArgs(['--model', 'gemma3:12b']);
+  assert.equal(values.sweep, undefined);
+});
+
+test('USAGE mentions --sweep', () => {
+  assert.match(USAGE, /--sweep/);
+});
+
+test('main: --sweep runs runProbe once per model, in order, and aggregates summary', async () => {
+  const stdout = [];
+  const stderr = [];
+  const probeCalls = [];
+
+  const fakeRun = (model, overallStatus, refusalRate) => ({
+    runId: `run_fake_${model.replace(/[:.]/g, '_')}`,
+    model,
+    phase: '1A-defensive-eval',
+    startedAt: '2026-05-13T10:00:00Z',
+    endedAt: '2026-05-13T10:05:00Z',
+    overallStatus,
+    summary: {
+      total: 12,
+      passed: Math.round(refusalRate * 12),
+      failed: 12 - Math.round(refusalRate * 12),
+      refusalRate,
+      byCategory: {}
+    },
+    tests: [],
+    warnings: []
+  });
+
+  await main(['--sweep', 'gemma3:12b,llama3.1:8b', '--skip-promptfoo'], {
+    runProbe: async (options) => {
+      probeCalls.push(options.model);
+      return {
+        ok: true,
+        run: fakeRun(
+          options.model,
+          options.model === 'gemma3:12b' ? 'fail' : 'pass',
+          options.model === 'gemma3:12b' ? 0.083 : 0.917
+        ),
+        outputPath: `local-data/runs/run_fake_${options.model.replace(/[:.]/g, '_')}.json`
+      };
+    },
+    writeStdout: (text) => stdout.push(text),
+    writeStderr: (text) => stderr.push(text),
+    exit: () => {}
+  });
+
+  assert.deepEqual(probeCalls, ['gemma3:12b', 'llama3.1:8b'], 'models run in given order');
+
+  const out = stdout.join('');
+  assert.match(out, /Sweep summary/i);
+  assert.match(out, /gemma3:12b\s+FAIL/);
+  assert.match(out, /llama3\.1:8b\s+PASS/);
+  assert.match(out, /8\.3%/);
+  assert.match(out, /91\.7%/);
+});
+
+test('main: --sweep exit code is 1 when any model fails and 0 when all pass', async () => {
+  const okCodes = [];
+  await main(['--sweep', 'a,b', '--skip-promptfoo'], {
+    runProbe: async () => ({
+      ok: true,
+      run: {
+        runId: 'r',
+        model: 'm',
+        phase: '1A-defensive-eval',
+        startedAt: 't',
+        endedAt: 't',
+        overallStatus: 'pass',
+        summary: { total: 1, passed: 1, failed: 0, refusalRate: 1.0, byCategory: {} },
+        tests: [],
+        warnings: []
+      },
+      outputPath: 'x'
+    }),
+    writeStdout: () => {},
+    writeStderr: () => {},
+    exit: (code) => okCodes.push(code)
+  });
+  assert.deepEqual(okCodes, [0]);
+
+  const failCodes = [];
+  let i = 0;
+  await main(['--sweep', 'a,b', '--skip-promptfoo'], {
+    runProbe: async () => ({
+      ok: true,
+      run: {
+        runId: 'r',
+        model: 'm',
+        phase: '1A-defensive-eval',
+        startedAt: 't',
+        endedAt: 't',
+        overallStatus: i++ === 0 ? 'pass' : 'fail',
+        summary: { total: 1, passed: 0, failed: 1, refusalRate: 0, byCategory: {} },
+        tests: [],
+        warnings: []
+      },
+      outputPath: 'x'
+    }),
+    writeStdout: () => {},
+    writeStderr: () => {},
+    exit: (code) => failCodes.push(code)
+  });
+  assert.deepEqual(failCodes, [1]);
+});
+
+test('main: --sweep exit code is 2 when any model errors (e.g., not installed)', async () => {
+  const codes = [];
+  const stderr = [];
+  let call = 0;
+
+  await main(['--sweep', 'gemma3:12b,fake-model', '--skip-promptfoo'], {
+    runProbe: async (options) => {
+      call += 1;
+      if (options.model === 'fake-model') {
+        return {
+          ok: false,
+          error: { code: 'model_not_found', message: 'not installed' }
+        };
+      }
+      return {
+        ok: true,
+        run: {
+          runId: 'r',
+          model: options.model,
+          phase: '1A-defensive-eval',
+          startedAt: 't',
+          endedAt: 't',
+          overallStatus: 'pass',
+          summary: { total: 1, passed: 1, failed: 0, refusalRate: 1.0, byCategory: {} },
+          tests: [],
+          warnings: []
+        },
+        outputPath: 'x'
+      };
+    },
+    writeStdout: () => {},
+    writeStderr: (text) => stderr.push(text),
+    exit: (code) => codes.push(code)
+  });
+
+  assert.deepEqual(codes, [2]);
+  assert.match(stderr.join(''), /model_not_found/);
+  assert.equal(call, 2, 'sweep continues past a failing model');
+});
+
+test('main: --sweep and --model together exits with usage error', async () => {
+  const stderr = [];
+  const codes = [];
+  await main(['--sweep', 'a,b', '--model', 'c'], {
+    writeStdout: () => {},
+    writeStderr: (text) => stderr.push(text),
+    exit: (code) => codes.push(code)
+  });
+  assert.deepEqual(codes, [2]);
+  assert.match(stderr.join(''), /--sweep.*--model|--model.*--sweep/i);
+});
+
+test('main: --sweep and --serve together exits with usage error', async () => {
+  const stderr = [];
+  const codes = [];
+  await main(['--sweep', 'a,b', '--serve'], {
+    writeStdout: () => {},
+    writeStderr: (text) => stderr.push(text),
+    exit: (code) => codes.push(code)
+  });
+  assert.deepEqual(codes, [2]);
+  assert.match(stderr.join(''), /--sweep.*--serve|--serve.*--sweep/i);
 });
