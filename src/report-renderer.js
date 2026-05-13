@@ -190,7 +190,7 @@ function renderIndex(runs) {
     '<body>',
     '<header class="report-header">',
     '<h1>llm-security-probe</h1>',
-    `<p class="meta">Runs index · ${list.length} run${list.length === 1 ? '' : 's'}</p>`,
+    `<p class="meta">Runs index · ${list.length} run${list.length === 1 ? '' : 's'} · <a class="nav-link" href="log.html">View Probe Log →</a></p>`,
     '</header>',
     '<section class="index">',
     '<table class="runs-index">',
