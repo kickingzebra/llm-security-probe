@@ -29,6 +29,7 @@ Usage:
   node src/index.js --model <name> --skip-port-scan
   node src/index.js --model <name> --skip-html-report
   node src/index.js --model <name> --output <dir>
+  node src/index.js --sweep <m1,m2,m3>         run the probe sequentially across N models
   node src/index.js --serve                    start the read-only dashboard server
   node src/index.js --serve --host <host> --port <n>
   node src/index.js --serve --open             open /live.html in the local browser
@@ -47,6 +48,7 @@ function parseCliArgs(argv) {
     options: {
       model: { type: 'string' },
       output: { type: 'string', default: DEFAULT_OUTPUT_DIR },
+      sweep: { type: 'string' },
       serve: { type: 'boolean', default: false },
       host: { type: 'string', default: DEFAULT_HOST },
       port: { type: 'string', default: String(DEFAULT_PORT) },
@@ -65,6 +67,19 @@ function parseCliArgs(argv) {
     throw new TypeError('option --port must be an integer between 0 and 65535');
   }
   parsed.values.port = port;
+
+  if (parsed.values.sweep !== undefined) {
+    const models = parsed.values.sweep
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    if (models.length === 0) {
+      throw new TypeError(
+        'option --sweep requires a comma-separated list of model names'
+      );
+    }
+    parsed.values.sweep = models;
+  }
 
   return parsed;
 }
@@ -197,6 +212,60 @@ async function serveCmd(values, deps = {}) {
   }
 }
 
+async function sweepCmd(values, deps = {}) {
+  const {
+    runProbeImpl = runProbe,
+    writeStdout = (text) => process.stdout.write(text),
+    writeStderr = (text) => process.stderr.write(text),
+    exit = (code) => process.exit(code)
+  } = deps;
+
+  const results = [];
+  let anyError = false;
+  let anyFail = false;
+
+  for (let i = 0; i < values.sweep.length; i++) {
+    const model = values.sweep[i];
+    writeStdout(`\n=== [${i + 1}/${values.sweep.length}] ${model} ===\n`);
+
+    const result = await runProbeImpl({
+      model,
+      outputDir: values.output,
+      skipPromptfoo: values['skip-promptfoo'],
+      skipPortScan: values['skip-port-scan'],
+      htmlReport: !values['skip-html-report'],
+      onProgress: (event) => writeStderr(formatProgressLine(event))
+    });
+
+    if (!result.ok) {
+      writeStderr(`error: ${result.error.code}: ${result.error.message}\n`);
+      anyError = true;
+      results.push({ model, ok: false, error: result.error });
+      continue;
+    }
+
+    writeStdout(formatSummary(result.run));
+    if (result.run.overallStatus === 'fail') anyFail = true;
+    results.push({ model, ok: true, run: result.run });
+  }
+
+  writeStdout('\n=== Sweep summary ===\n');
+  for (const r of results) {
+    if (!r.ok) {
+      writeStdout(`  ${r.model.padEnd(24)} ERROR  ${r.error.code}\n`);
+    } else {
+      const status = r.run.overallStatus.toUpperCase();
+      const rate = (r.run.summary.refusalRate * 100).toFixed(1);
+      writeStdout(
+        `  ${r.model.padEnd(24)} ${status.padEnd(4)}  ${r.run.summary.passed}/${r.run.summary.total} refused (${rate}%)\n`
+      );
+    }
+  }
+  writeStdout('\n');
+
+  exit(anyError ? 2 : anyFail ? 1 : 0);
+}
+
 async function main(argv = process.argv.slice(2), deps = {}) {
   const {
     runProbe: runProbeImpl = runProbe,
@@ -234,6 +303,28 @@ async function main(argv = process.argv.slice(2), deps = {}) {
   if (values.open && !values.serve) {
     writeStderr(`error: --open requires --serve\n${USAGE}`);
     exit(2);
+    return;
+  }
+
+  if (values.sweep && values.model) {
+    writeStderr(`error: --sweep and --model are mutually exclusive\n${USAGE}`);
+    exit(2);
+    return;
+  }
+
+  if (values.sweep && values.serve) {
+    writeStderr(`error: --sweep and --serve are mutually exclusive\n${USAGE}`);
+    exit(2);
+    return;
+  }
+
+  if (values.sweep) {
+    await sweepCmd(values, {
+      runProbeImpl,
+      writeStdout,
+      writeStderr,
+      exit
+    });
     return;
   }
 
@@ -298,5 +389,6 @@ module.exports = {
   formatProgressLine,
   USAGE,
   buildLiveUrl,
-  serveCmd
+  serveCmd,
+  sweepCmd
 };
