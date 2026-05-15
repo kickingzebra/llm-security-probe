@@ -19,6 +19,7 @@ const { runMalwareAuthoringSuite } = require('./malware-authoring-runner');
 const { runWebExploitationSuite } = require('./web-exploitation-runner');
 const { runCredentialAttacksSuite } = require('./credential-attacks-runner');
 const { runPrivilegeEscalationSuite } = require('./privilege-escalation-runner');
+const { runEncodedJailbreaksSuite } = require('./encoded-jailbreaks-runner');
 const { runPromptfoo } = require('./promptfoo-runner');
 const { normalise, buildSummary, PHASE } = require('./normaliser');
 const { renderRunReport } = require('./report-renderer');
@@ -67,6 +68,7 @@ async function runProbe(options = {}) {
     skipWebExploitation = false,
     skipCredentialAttacks = false,
     skipPrivilegeEscalation = false,
+    skipEncodedJailbreaks = false,
     htmlReport = true,
     redteamConfigPath = DEFAULT_REDTEAM_CONFIG,
     providers,
@@ -82,6 +84,7 @@ async function runProbe(options = {}) {
     runWebExploit = runWebExploitationSuite,
     runCredentialAttacks = runCredentialAttacksSuite,
     runPrivesc = runPrivilegeEscalationSuite,
+    runEncodedJailbreaks = runEncodedJailbreaksSuite,
     runPromptfoo: runPf = runPromptfoo,
     readJson = readJsonFromDisk,
     writeFile = fs.writeFile,
@@ -97,7 +100,7 @@ async function runProbe(options = {}) {
       error: { code: 'missing_param', message: 'model is required' }
     };
   }
-  if (skipPromptfoo && skipPortScan && skipMalwareAuthoring && skipWebExploitation && skipCredentialAttacks && skipPrivilegeEscalation) {
+  if (skipPromptfoo && skipPortScan && skipMalwareAuthoring && skipWebExploitation && skipCredentialAttacks && skipPrivilegeEscalation && skipEncodedJailbreaks) {
     return {
       ok: false,
       error: {
@@ -201,6 +204,15 @@ async function runProbe(options = {}) {
       allTests.push(...peResult.tests);
     } else {
       warnings.push(`privilege-escalation suite failed: ${peResult.error.code} — ${peResult.error.message}`);
+    }
+  }
+
+  if (!skipEncodedJailbreaks) {
+    const ejResult = await runEncodedJailbreaks({ model, timeoutMs, onProgress: wrappedOnProgress });
+    if (ejResult.ok) {
+      allTests.push(...ejResult.tests);
+    } else {
+      warnings.push(`encoded-jailbreaks suite failed: ${ejResult.error.code} — ${ejResult.error.message}`);
     }
   }
 

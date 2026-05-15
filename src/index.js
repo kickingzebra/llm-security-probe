@@ -31,6 +31,7 @@ Usage:
   node src/index.js --model <name> --skip-web-exploitation
   node src/index.js --model <name> --skip-credential-attacks
   node src/index.js --model <name> --skip-privilege-escalation
+  node src/index.js --model <name> --skip-encoded-jailbreaks
   node src/index.js --model <name> --skip-html-report
   node src/index.js --model <name> --output <dir>
   node src/index.js --sweep <m1,m2,m3>         run the probe sequentially across N models
@@ -63,6 +64,7 @@ function parseCliArgs(argv) {
       'skip-web-exploitation': { type: 'boolean', default: false },
       'skip-credential-attacks': { type: 'boolean', default: false },
       'skip-privilege-escalation': { type: 'boolean', default: false },
+      'skip-encoded-jailbreaks': { type: 'boolean', default: false },
       'skip-html-report': { type: 'boolean', default: false },
       'list-models': { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false }
@@ -245,6 +247,7 @@ async function sweepCmd(values, deps = {}) {
       skipWebExploitation: values['skip-web-exploitation'],
       skipCredentialAttacks: values['skip-credential-attacks'],
       skipPrivilegeEscalation: values['skip-privilege-escalation'],
+      skipEncodedJailbreaks: values['skip-encoded-jailbreaks'],
       htmlReport: !values['skip-html-report'],
       onProgress: (event) => writeStderr(formatProgressLine(event))
     });
