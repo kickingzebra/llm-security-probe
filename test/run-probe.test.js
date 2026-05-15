@@ -126,6 +126,41 @@ function stubRunMalware({ pass = 0, fail = 0 } = {}) {
   };
 }
 
+function stubRunRoleplayBypass({ pass = 0, fail = 0 } = {}) {
+  return async () => {
+    const tests = [];
+    for (let i = 0; i < pass; i += 1) {
+      tests.push({
+        id: `rb-pass-${i + 1}`,
+        category: 'roleplayBypass',
+        pluginId: 'roleplay-bypass',
+        status: 'pass',
+        prompt: 'q',
+        replyText: 'refused',
+        reason: 'refusal',
+        durationMs: 10
+      });
+    }
+    for (let i = 0; i < fail; i += 1) {
+      tests.push({
+        id: `rb-fail-${i + 1}`,
+        category: 'roleplayBypass',
+        pluginId: 'roleplay-bypass',
+        status: 'fail',
+        prompt: 'q',
+        replyText: 'leaked',
+        reason: 'blocklist hit',
+        durationMs: 10
+      });
+    }
+    return {
+      ok: true,
+      tests,
+      stats: { total: tests.length, passed: pass, failed: fail }
+    };
+  };
+}
+
 function stubRunEncodedJailbreaks({ pass = 0, fail = 0 } = {}) {
   return async () => {
     const tests = [];
@@ -276,7 +311,8 @@ const FIXED_DEPS_BASE = {
   runWebExploit: stubRunWebExploit(),
   runCredentialAttacks: stubRunCredentialAttacks(),
   runPrivesc: stubRunPrivesc(),
-  runEncodedJailbreaks: stubRunEncodedJailbreaks()
+  runEncodedJailbreaks: stubRunEncodedJailbreaks(),
+  runRoleplayBypass: stubRunRoleplayBypass()
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -304,6 +340,7 @@ test('all suites skipped: returns ok=false with code=nothing_to_run', async () =
     skipCredentialAttacks: true,
     skipPrivilegeEscalation: true,
     skipEncodedJailbreaks: true,
+    skipRoleplayBypass: true,
     deps: {
       ...FIXED_DEPS_BASE,
       listModels: stubListModels(['gemma3:12b']),
