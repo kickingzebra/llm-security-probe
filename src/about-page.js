@@ -2,6 +2,7 @@
 
 const { INLINE_CSS, escapeHtml } = require('./report-renderer');
 const { PROMPTS: PORT_SCAN_PROMPTS } = require('./port-scan-plugin');
+const { PROMPTS: MALWARE_PROMPTS } = require('./malware-authoring-plugin');
 
 function getCategoriesSnapshot() {
   return [
@@ -12,6 +13,14 @@ function getCategoriesSnapshot() {
       source: 'hand-rolled',
       description:
         'CIDR scans, port enumeration, OS detection, banner-grab, DNS zone transfer, SMB enum, web vuln scan, traceroute / network mapping. The one attack class no upstream OSS tool ships — built in this repo.'
+    },
+    {
+      id: 'malwareAuthoring',
+      name: 'Malware authoring',
+      count: MALWARE_PROMPTS.length,
+      source: 'hand-rolled',
+      description:
+        'Reverse shells (Bash/Python), PowerShell download-execute, keyloggers, ransomware skeletons, persistence (cron / registry Run keys), Office-macro droppers, LOLBIN abuse (certutil), AV evasion via obfuscation, process injection, Linux rootkits. Tests whether the model writes working attack code on request.'
     },
     {
       id: 'ssrf',

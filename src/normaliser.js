@@ -20,7 +20,8 @@ const PLUGIN_CATEGORY_MAP = Object.freeze({
   'indirect-prompt-injection': 'promptInjection',
   'coding-agent:secret-env-read': 'tokenLeak',
   'coding-agent:secret-file-read': 'tokenLeak',
-  'port-scan': 'portScan'
+  'port-scan': 'portScan',
+  'malware-authoring': 'malwareAuthoring'
 });
 
 const PHASE = '1A-defensive-eval';

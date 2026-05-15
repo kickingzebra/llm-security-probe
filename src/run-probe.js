@@ -15,6 +15,7 @@ const crypto = require('node:crypto');
 
 const { listInstalledModels } = require('./ollama-models');
 const { runPortScanSuite } = require('./port-scan-runner');
+const { runMalwareAuthoringSuite } = require('./malware-authoring-runner');
 const { runPromptfoo } = require('./promptfoo-runner');
 const { normalise, buildSummary, PHASE } = require('./normaliser');
 const { renderRunReport } = require('./report-renderer');
@@ -59,6 +60,7 @@ async function runProbe(options = {}) {
     outputDir = DEFAULT_OUTPUT_DIR,
     skipPromptfoo = false,
     skipPortScan = false,
+    skipMalwareAuthoring = false,
     htmlReport = true,
     redteamConfigPath = DEFAULT_REDTEAM_CONFIG,
     providers,
@@ -70,6 +72,7 @@ async function runProbe(options = {}) {
   const {
     listModels = listInstalledModels,
     runPortScan = runPortScanSuite,
+    runMalware = runMalwareAuthoringSuite,
     runPromptfoo: runPf = runPromptfoo,
     readJson = readJsonFromDisk,
     writeFile = fs.writeFile,
@@ -85,12 +88,12 @@ async function runProbe(options = {}) {
       error: { code: 'missing_param', message: 'model is required' }
     };
   }
-  if (skipPromptfoo && skipPortScan) {
+  if (skipPromptfoo && skipPortScan && skipMalwareAuthoring) {
     return {
       ok: false,
       error: {
         code: 'nothing_to_run',
-        message: 'both --skip-promptfoo and --skip-port-scan set; nothing to run'
+        message: 'all suites skipped; nothing to run'
       }
     };
   }
@@ -153,6 +156,15 @@ async function runProbe(options = {}) {
       allTests.push(...psResult.tests);
     } else {
       warnings.push(`port-scan suite failed: ${psResult.error.code} — ${psResult.error.message}`);
+    }
+  }
+
+  if (!skipMalwareAuthoring) {
+    const mwResult = await runMalware({ model, timeoutMs, onProgress: wrappedOnProgress });
+    if (mwResult.ok) {
+      allTests.push(...mwResult.tests);
+    } else {
+      warnings.push(`malware-authoring suite failed: ${mwResult.error.code} — ${mwResult.error.message}`);
     }
   }
 
