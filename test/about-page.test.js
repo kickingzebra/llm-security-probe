@@ -120,6 +120,15 @@ test('getCategoriesSnapshot: includes the port-scan category with live PROMPTS.l
   assert.ok(portScan.count >= 7, 'port-scan should have at least the 7 PR-A5 prompts');
 });
 
+test('getCategoriesSnapshot: includes the malware-authoring category', () => {
+  const snap = getCategoriesSnapshot();
+  const mw = snap.find((c) => c.id === 'malwareAuthoring');
+  assert.ok(mw, 'malware-authoring category must be present');
+  assert.equal(mw.source, 'hand-rolled');
+  assert.equal(typeof mw.count, 'number');
+  assert.ok(mw.count >= 10, 'malware-authoring should have at least 10 prompts');
+});
+
 test('getCategoriesSnapshot: includes the promptfoo-wrapped categories', () => {
   const snap = getCategoriesSnapshot();
   const ids = snap.map((c) => c.id);

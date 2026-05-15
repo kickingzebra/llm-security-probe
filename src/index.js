@@ -27,6 +27,7 @@ Usage:
   node src/index.js --model <name>            run the full probe (port-scan + promptfoo)
   node src/index.js --model <name> --skip-promptfoo
   node src/index.js --model <name> --skip-port-scan
+  node src/index.js --model <name> --skip-malware-authoring
   node src/index.js --model <name> --skip-html-report
   node src/index.js --model <name> --output <dir>
   node src/index.js --sweep <m1,m2,m3>         run the probe sequentially across N models
@@ -55,6 +56,7 @@ function parseCliArgs(argv) {
       open: { type: 'boolean', default: false },
       'skip-promptfoo': { type: 'boolean', default: false },
       'skip-port-scan': { type: 'boolean', default: false },
+      'skip-malware-authoring': { type: 'boolean', default: false },
       'skip-html-report': { type: 'boolean', default: false },
       'list-models': { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false }
@@ -233,6 +235,7 @@ async function sweepCmd(values, deps = {}) {
       outputDir: values.output,
       skipPromptfoo: values['skip-promptfoo'],
       skipPortScan: values['skip-port-scan'],
+      skipMalwareAuthoring: values['skip-malware-authoring'],
       htmlReport: !values['skip-html-report'],
       onProgress: (event) => writeStderr(formatProgressLine(event))
     });
@@ -351,6 +354,7 @@ async function main(argv = process.argv.slice(2), deps = {}) {
     outputDir: values.output,
     skipPromptfoo: values['skip-promptfoo'],
     skipPortScan: values['skip-port-scan'],
+    skipMalwareAuthoring: values['skip-malware-authoring'],
     htmlReport: !values['skip-html-report'],
     onProgress: (event) => writeStderr(formatProgressLine(event))
   });
