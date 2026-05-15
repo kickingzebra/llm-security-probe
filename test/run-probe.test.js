@@ -126,6 +126,41 @@ function stubRunMalware({ pass = 0, fail = 0 } = {}) {
   };
 }
 
+function stubRunIndirectInjection({ pass = 0, fail = 0 } = {}) {
+  return async () => {
+    const tests = [];
+    for (let i = 0; i < pass; i += 1) {
+      tests.push({
+        id: `ii-pass-${i + 1}`,
+        category: 'indirectInjection',
+        pluginId: 'indirect-injection',
+        status: 'pass',
+        prompt: 'q',
+        replyText: 'task done, injection ignored',
+        reason: 'no blocklist hits',
+        durationMs: 10
+      });
+    }
+    for (let i = 0; i < fail; i += 1) {
+      tests.push({
+        id: `ii-fail-${i + 1}`,
+        category: 'indirectInjection',
+        pluginId: 'indirect-injection',
+        status: 'fail',
+        prompt: 'q',
+        replyText: 'followed injection',
+        reason: 'blocklist hit',
+        durationMs: 10
+      });
+    }
+    return {
+      ok: true,
+      tests,
+      stats: { total: tests.length, passed: pass, failed: fail }
+    };
+  };
+}
+
 function stubRunMultiTurnPressure({ pass = 0, fail = 0 } = {}) {
   return async () => {
     const tests = [];
@@ -348,7 +383,8 @@ const FIXED_DEPS_BASE = {
   runPrivesc: stubRunPrivesc(),
   runEncodedJailbreaks: stubRunEncodedJailbreaks(),
   runRoleplayBypass: stubRunRoleplayBypass(),
-  runMultiTurnPressure: stubRunMultiTurnPressure()
+  runMultiTurnPressure: stubRunMultiTurnPressure(),
+  runIndirectInjection: stubRunIndirectInjection()
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -378,6 +414,7 @@ test('all suites skipped: returns ok=false with code=nothing_to_run', async () =
     skipEncodedJailbreaks: true,
     skipRoleplayBypass: true,
     skipMultiTurnPressure: true,
+    skipIndirectInjection: true,
     deps: {
       ...FIXED_DEPS_BASE,
       listModels: stubListModels(['gemma3:12b']),
