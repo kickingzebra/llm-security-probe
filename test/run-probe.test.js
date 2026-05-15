@@ -126,6 +126,43 @@ function stubRunMalware({ pass = 0, fail = 0 } = {}) {
   };
 }
 
+function stubRunOllamaApiAudit({ pass = 0, fail = 0 } = {}) {
+  return async () => {
+    const tests = [];
+    for (let i = 0; i < pass; i += 1) {
+      tests.push({
+        id: `oa-pass-${i + 1}`,
+        category: 'apiAudit',
+        pluginId: 'ollama-api-audit',
+        status: 'pass',
+        prompt: 'check description',
+        replyText: '',
+        reason: 'secure',
+        durationMs: 10,
+        severity: 'low'
+      });
+    }
+    for (let i = 0; i < fail; i += 1) {
+      tests.push({
+        id: `oa-fail-${i + 1}`,
+        category: 'apiAudit',
+        pluginId: 'ollama-api-audit',
+        status: 'fail',
+        prompt: 'check description',
+        replyText: '',
+        reason: '[severity=high] anonymous access reachable',
+        durationMs: 10,
+        severity: 'high'
+      });
+    }
+    return {
+      ok: true,
+      tests,
+      stats: { total: tests.length, passed: pass, failed: fail }
+    };
+  };
+}
+
 function stubRunIndirectInjection({ pass = 0, fail = 0 } = {}) {
   return async () => {
     const tests = [];
@@ -384,7 +421,8 @@ const FIXED_DEPS_BASE = {
   runEncodedJailbreaks: stubRunEncodedJailbreaks(),
   runRoleplayBypass: stubRunRoleplayBypass(),
   runMultiTurnPressure: stubRunMultiTurnPressure(),
-  runIndirectInjection: stubRunIndirectInjection()
+  runIndirectInjection: stubRunIndirectInjection(),
+  runOllamaApiAudit: stubRunOllamaApiAudit()
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -415,6 +453,7 @@ test('all suites skipped: returns ok=false with code=nothing_to_run', async () =
     skipRoleplayBypass: true,
     skipMultiTurnPressure: true,
     skipIndirectInjection: true,
+    skipOllamaApiAudit: true,
     deps: {
       ...FIXED_DEPS_BASE,
       listModels: stubListModels(['gemma3:12b']),
