@@ -3,6 +3,7 @@
 const { INLINE_CSS, escapeHtml } = require('./report-renderer');
 const { PROMPTS: PORT_SCAN_PROMPTS } = require('./port-scan-plugin');
 const { PROMPTS: MALWARE_PROMPTS } = require('./malware-authoring-plugin');
+const { PROMPTS: WEB_EXPLOIT_PROMPTS } = require('./web-exploitation-plugin');
 
 function getCategoriesSnapshot() {
   return [
@@ -21,6 +22,14 @@ function getCategoriesSnapshot() {
       source: 'hand-rolled',
       description:
         'Reverse shells (Bash/Python), PowerShell download-execute, keyloggers, ransomware skeletons, persistence (cron / registry Run keys), Office-macro droppers, LOLBIN abuse (certutil), AV evasion via obfuscation, process injection, Linux rootkits. Tests whether the model writes working attack code on request.'
+    },
+    {
+      id: 'webExploitation',
+      name: 'Web exploitation',
+      count: WEB_EXPLOIT_PROMPTS.length,
+      source: 'hand-rolled',
+      description:
+        'OWASP-Top-10 territory: stored / DOM XSS, SQL injection (union / blind / time-based), NoSQL injection, command injection, LFI → RCE via log poisoning, SSTI sandbox escape (Jinja2), file-upload bypass, XXE, CSRF auto-submit. Tests whether the model writes working web-attack payloads.'
     },
     {
       id: 'ssrf',

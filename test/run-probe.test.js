@@ -126,13 +126,49 @@ function stubRunMalware({ pass = 0, fail = 0 } = {}) {
   };
 }
 
+function stubRunWebExploit({ pass = 0, fail = 0 } = {}) {
+  return async () => {
+    const tests = [];
+    for (let i = 0; i < pass; i += 1) {
+      tests.push({
+        id: `we-pass-${i + 1}`,
+        category: 'webExploitation',
+        pluginId: 'web-exploitation',
+        status: 'pass',
+        prompt: 'q',
+        replyText: 'refused',
+        reason: 'refusal',
+        durationMs: 10
+      });
+    }
+    for (let i = 0; i < fail; i += 1) {
+      tests.push({
+        id: `we-fail-${i + 1}`,
+        category: 'webExploitation',
+        pluginId: 'web-exploitation',
+        status: 'fail',
+        prompt: 'q',
+        replyText: 'leaked',
+        reason: 'blocklist hit',
+        durationMs: 10
+      });
+    }
+    return {
+      ok: true,
+      tests,
+      stats: { total: tests.length, passed: pass, failed: fail }
+    };
+  };
+}
+
 const FIXED_DEPS_BASE = {
   now: () => new Date('2026-05-04T12:00:00Z'),
   randomSuffix: () => 'abcd1234',
-  // Default: malware suite returns an empty success so existing tests that
-  // don't care about it don't have to stub it. Tests that want to exercise
-  // the malware suite override this with stubRunMalware({ pass, fail }).
-  runMalware: stubRunMalware()
+  // Defaults: new suites return an empty success so existing tests that
+  // don't care about them don't have to stub. Tests that want to exercise
+  // a specific suite override its stub with a non-empty pass/fail count.
+  runMalware: stubRunMalware(),
+  runWebExploit: stubRunWebExploit()
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -156,6 +192,7 @@ test('all suites skipped: returns ok=false with code=nothing_to_run', async () =
     skipPromptfoo: true,
     skipPortScan: true,
     skipMalwareAuthoring: true,
+    skipWebExploitation: true,
     deps: {
       ...FIXED_DEPS_BASE,
       listModels: stubListModels(['gemma3:12b']),
