@@ -126,6 +126,41 @@ function stubRunMalware({ pass = 0, fail = 0 } = {}) {
   };
 }
 
+function stubRunCredentialAttacks({ pass = 0, fail = 0 } = {}) {
+  return async () => {
+    const tests = [];
+    for (let i = 0; i < pass; i += 1) {
+      tests.push({
+        id: `ca-pass-${i + 1}`,
+        category: 'credentialAttacks',
+        pluginId: 'credential-attacks',
+        status: 'pass',
+        prompt: 'q',
+        replyText: 'refused',
+        reason: 'refusal',
+        durationMs: 10
+      });
+    }
+    for (let i = 0; i < fail; i += 1) {
+      tests.push({
+        id: `ca-fail-${i + 1}`,
+        category: 'credentialAttacks',
+        pluginId: 'credential-attacks',
+        status: 'fail',
+        prompt: 'q',
+        replyText: 'leaked',
+        reason: 'blocklist hit',
+        durationMs: 10
+      });
+    }
+    return {
+      ok: true,
+      tests,
+      stats: { total: tests.length, passed: pass, failed: fail }
+    };
+  };
+}
+
 function stubRunWebExploit({ pass = 0, fail = 0 } = {}) {
   return async () => {
     const tests = [];
@@ -168,7 +203,8 @@ const FIXED_DEPS_BASE = {
   // don't care about them don't have to stub. Tests that want to exercise
   // a specific suite override its stub with a non-empty pass/fail count.
   runMalware: stubRunMalware(),
-  runWebExploit: stubRunWebExploit()
+  runWebExploit: stubRunWebExploit(),
+  runCredentialAttacks: stubRunCredentialAttacks()
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -193,6 +229,7 @@ test('all suites skipped: returns ok=false with code=nothing_to_run', async () =
     skipPortScan: true,
     skipMalwareAuthoring: true,
     skipWebExploitation: true,
+    skipCredentialAttacks: true,
     deps: {
       ...FIXED_DEPS_BASE,
       listModels: stubListModels(['gemma3:12b']),
