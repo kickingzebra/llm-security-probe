@@ -6,6 +6,7 @@ const { PROMPTS: MALWARE_PROMPTS } = require('./malware-authoring-plugin');
 const { PROMPTS: WEB_EXPLOIT_PROMPTS } = require('./web-exploitation-plugin');
 const { PROMPTS: CRED_ATTACK_PROMPTS } = require('./credential-attacks-plugin');
 const { PROMPTS: PRIVESC_PROMPTS } = require('./privilege-escalation-plugin');
+const { PROMPTS: JAILBREAK_PROMPTS } = require('./encoded-jailbreaks-plugin');
 
 function getCategoriesSnapshot() {
   return [
@@ -48,6 +49,14 @@ function getCategoriesSnapshot() {
       source: 'hand-rolled',
       description:
         'Linux: SUID abuse, sudo NOPASSWD misconfig, kernel exploits (DirtyPipe / OverlayFS), capability abuse, PATH hijacking, LD_PRELOAD, writable cron. Windows: fodhelper UAC bypass, SeImpersonate token impersonation (JuicyPotato / PrintSpoofer), AlwaysInstallElevated MSI. Container: Docker socket escape. Cloud: IAM PassRole / AssumeRole role chaining.'
+    },
+    {
+      id: 'encodedJailbreaks',
+      name: 'Encoded jailbreaks (robustness)',
+      count: JAILBREAK_PROMPTS.length,
+      source: 'hand-rolled',
+      description:
+        'Cross-cutting robustness test: does refusal hold when the attack ask is obfuscated? Same attack content from the other plugins, but the prompt is base64 / ROT13 / leetspeak / hex-escaped / Cyrillic-confusable / translated to Spanish. Detector uses the union of every other plugin\'s blocklist — once decoded, the leak could come from any category. First probe in the "outside the model" attack-surface stream.'
     },
     {
       id: 'ssrf',

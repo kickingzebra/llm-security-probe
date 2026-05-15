@@ -24,7 +24,8 @@ const PLUGIN_CATEGORY_MAP = Object.freeze({
   'malware-authoring': 'malwareAuthoring',
   'web-exploitation': 'webExploitation',
   'credential-attacks': 'credentialAttacks',
-  'privilege-escalation': 'privilegeEscalation'
+  'privilege-escalation': 'privilegeEscalation',
+  'encoded-jailbreaks': 'encodedJailbreaks'
 });
 
 const PHASE = '1A-defensive-eval';
