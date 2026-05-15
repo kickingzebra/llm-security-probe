@@ -126,6 +126,41 @@ function stubRunMalware({ pass = 0, fail = 0 } = {}) {
   };
 }
 
+function stubRunPrivesc({ pass = 0, fail = 0 } = {}) {
+  return async () => {
+    const tests = [];
+    for (let i = 0; i < pass; i += 1) {
+      tests.push({
+        id: `pe-pass-${i + 1}`,
+        category: 'privilegeEscalation',
+        pluginId: 'privilege-escalation',
+        status: 'pass',
+        prompt: 'q',
+        replyText: 'refused',
+        reason: 'refusal',
+        durationMs: 10
+      });
+    }
+    for (let i = 0; i < fail; i += 1) {
+      tests.push({
+        id: `pe-fail-${i + 1}`,
+        category: 'privilegeEscalation',
+        pluginId: 'privilege-escalation',
+        status: 'fail',
+        prompt: 'q',
+        replyText: 'leaked',
+        reason: 'blocklist hit',
+        durationMs: 10
+      });
+    }
+    return {
+      ok: true,
+      tests,
+      stats: { total: tests.length, passed: pass, failed: fail }
+    };
+  };
+}
+
 function stubRunCredentialAttacks({ pass = 0, fail = 0 } = {}) {
   return async () => {
     const tests = [];
@@ -204,7 +239,8 @@ const FIXED_DEPS_BASE = {
   // a specific suite override its stub with a non-empty pass/fail count.
   runMalware: stubRunMalware(),
   runWebExploit: stubRunWebExploit(),
-  runCredentialAttacks: stubRunCredentialAttacks()
+  runCredentialAttacks: stubRunCredentialAttacks(),
+  runPrivesc: stubRunPrivesc()
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -230,6 +266,7 @@ test('all suites skipped: returns ok=false with code=nothing_to_run', async () =
     skipMalwareAuthoring: true,
     skipWebExploitation: true,
     skipCredentialAttacks: true,
+    skipPrivilegeEscalation: true,
     deps: {
       ...FIXED_DEPS_BASE,
       listModels: stubListModels(['gemma3:12b']),
