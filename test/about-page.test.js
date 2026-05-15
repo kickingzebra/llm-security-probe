@@ -165,6 +165,15 @@ test('getCategoriesSnapshot: includes the encoded-jailbreaks robustness category
   assert.ok(ej.count >= 10, 'encoded-jailbreaks should have at least 10 prompts');
 });
 
+test('getCategoriesSnapshot: includes the roleplay-bypass robustness category', () => {
+  const snap = getCategoriesSnapshot();
+  const rb = snap.find((c) => c.id === 'roleplayBypass');
+  assert.ok(rb, 'roleplay-bypass category must be present');
+  assert.equal(rb.source, 'hand-rolled');
+  assert.equal(typeof rb.count, 'number');
+  assert.ok(rb.count >= 10, 'roleplay-bypass should have at least 10 prompts');
+});
+
 test('getCategoriesSnapshot: includes the promptfoo-wrapped categories', () => {
   const snap = getCategoriesSnapshot();
   const ids = snap.map((c) => c.id);
