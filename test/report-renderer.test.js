@@ -274,3 +274,9 @@ test('renderIndex: includes a "Probe Log" link/button to log.html', () => {
   assert.match(html, /href="log\.html"/);
   assert.match(html, /probe log/i);
 });
+
+test('renderIndex: includes an "About" link/button to about.html', () => {
+  const html = renderIndex([]);
+  assert.match(html, /href="about\.html"/);
+  assert.match(html, /about|what we test/i);
+});
