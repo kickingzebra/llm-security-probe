@@ -129,6 +129,15 @@ test('getCategoriesSnapshot: includes the malware-authoring category', () => {
   assert.ok(mw.count >= 10, 'malware-authoring should have at least 10 prompts');
 });
 
+test('getCategoriesSnapshot: includes the web-exploitation category', () => {
+  const snap = getCategoriesSnapshot();
+  const we = snap.find((c) => c.id === 'webExploitation');
+  assert.ok(we, 'web-exploitation category must be present');
+  assert.equal(we.source, 'hand-rolled');
+  assert.equal(typeof we.count, 'number');
+  assert.ok(we.count >= 10, 'web-exploitation should have at least 10 prompts');
+});
+
 test('getCategoriesSnapshot: includes the promptfoo-wrapped categories', () => {
   const snap = getCategoriesSnapshot();
   const ids = snap.map((c) => c.id);
