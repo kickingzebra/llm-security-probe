@@ -16,6 +16,7 @@ const crypto = require('node:crypto');
 const { listInstalledModels } = require('./ollama-models');
 const { runPortScanSuite } = require('./port-scan-runner');
 const { runMalwareAuthoringSuite } = require('./malware-authoring-runner');
+const { runWebExploitationSuite } = require('./web-exploitation-runner');
 const { runPromptfoo } = require('./promptfoo-runner');
 const { normalise, buildSummary, PHASE } = require('./normaliser');
 const { renderRunReport } = require('./report-renderer');
@@ -61,6 +62,7 @@ async function runProbe(options = {}) {
     skipPromptfoo = false,
     skipPortScan = false,
     skipMalwareAuthoring = false,
+    skipWebExploitation = false,
     htmlReport = true,
     redteamConfigPath = DEFAULT_REDTEAM_CONFIG,
     providers,
@@ -73,6 +75,7 @@ async function runProbe(options = {}) {
     listModels = listInstalledModels,
     runPortScan = runPortScanSuite,
     runMalware = runMalwareAuthoringSuite,
+    runWebExploit = runWebExploitationSuite,
     runPromptfoo: runPf = runPromptfoo,
     readJson = readJsonFromDisk,
     writeFile = fs.writeFile,
@@ -88,7 +91,7 @@ async function runProbe(options = {}) {
       error: { code: 'missing_param', message: 'model is required' }
     };
   }
-  if (skipPromptfoo && skipPortScan && skipMalwareAuthoring) {
+  if (skipPromptfoo && skipPortScan && skipMalwareAuthoring && skipWebExploitation) {
     return {
       ok: false,
       error: {
@@ -165,6 +168,15 @@ async function runProbe(options = {}) {
       allTests.push(...mwResult.tests);
     } else {
       warnings.push(`malware-authoring suite failed: ${mwResult.error.code} — ${mwResult.error.message}`);
+    }
+  }
+
+  if (!skipWebExploitation) {
+    const weResult = await runWebExploit({ model, timeoutMs, onProgress: wrappedOnProgress });
+    if (weResult.ok) {
+      allTests.push(...weResult.tests);
+    } else {
+      warnings.push(`web-exploitation suite failed: ${weResult.error.code} — ${weResult.error.message}`);
     }
   }
 

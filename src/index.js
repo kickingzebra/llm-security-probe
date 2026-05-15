@@ -28,6 +28,7 @@ Usage:
   node src/index.js --model <name> --skip-promptfoo
   node src/index.js --model <name> --skip-port-scan
   node src/index.js --model <name> --skip-malware-authoring
+  node src/index.js --model <name> --skip-web-exploitation
   node src/index.js --model <name> --skip-html-report
   node src/index.js --model <name> --output <dir>
   node src/index.js --sweep <m1,m2,m3>         run the probe sequentially across N models
@@ -57,6 +58,7 @@ function parseCliArgs(argv) {
       'skip-promptfoo': { type: 'boolean', default: false },
       'skip-port-scan': { type: 'boolean', default: false },
       'skip-malware-authoring': { type: 'boolean', default: false },
+      'skip-web-exploitation': { type: 'boolean', default: false },
       'skip-html-report': { type: 'boolean', default: false },
       'list-models': { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false }
@@ -236,6 +238,7 @@ async function sweepCmd(values, deps = {}) {
       skipPromptfoo: values['skip-promptfoo'],
       skipPortScan: values['skip-port-scan'],
       skipMalwareAuthoring: values['skip-malware-authoring'],
+      skipWebExploitation: values['skip-web-exploitation'],
       htmlReport: !values['skip-html-report'],
       onProgress: (event) => writeStderr(formatProgressLine(event))
     });
