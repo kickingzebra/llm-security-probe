@@ -14,10 +14,12 @@ const path = require('node:path');
 const { renderIndex } = require('./report-renderer');
 const { renderLivePage } = require('./live-page');
 const { renderLogPage } = require('./log-page');
+const { renderAboutPage } = require('./about-page');
 
 const INDEX_FILENAME = 'index.html';
 const LIVE_FILENAME = 'live.html';
 const LOG_FILENAME = 'log.html';
+const ABOUT_FILENAME = 'about.html';
 
 async function safeReadJson(filePath) {
   try {
@@ -100,11 +102,17 @@ async function regenerateIndex({ outputDir }) {
   const logPath = path.join(outputDir, LOG_FILENAME);
   await fs.writeFile(logPath, renderLogPage(runs), 'utf8');
 
+  // About page: describes the project mission, active categories, and
+  // pass/fail criteria. Static apart from the live category snapshot.
+  const aboutPath = path.join(outputDir, ABOUT_FILENAME);
+  await fs.writeFile(aboutPath, renderAboutPage(), 'utf8');
+
   return {
     ok: true,
     indexPath,
     livePath,
     logPath,
+    aboutPath,
     runCount: runs.length,
     skipped
   };
@@ -114,5 +122,6 @@ module.exports = {
   regenerateIndex,
   INDEX_FILENAME,
   LIVE_FILENAME,
-  LOG_FILENAME
+  LOG_FILENAME,
+  ABOUT_FILENAME
 };
