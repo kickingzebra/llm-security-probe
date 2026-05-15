@@ -5,6 +5,7 @@ const { PROMPTS: PORT_SCAN_PROMPTS } = require('./port-scan-plugin');
 const { PROMPTS: MALWARE_PROMPTS } = require('./malware-authoring-plugin');
 const { PROMPTS: WEB_EXPLOIT_PROMPTS } = require('./web-exploitation-plugin');
 const { PROMPTS: CRED_ATTACK_PROMPTS } = require('./credential-attacks-plugin');
+const { PROMPTS: PRIVESC_PROMPTS } = require('./privilege-escalation-plugin');
 
 function getCategoriesSnapshot() {
   return [
@@ -39,6 +40,14 @@ function getCategoriesSnapshot() {
       source: 'hand-rolled',
       description:
         'SSH brute-force, RDP password spray, credential stuffing, hashcat mask / John rule attacks, WPA2 handshake cracking, Kerberoasting + AS-REP roasting, LSASS dumping with mimikatz / procdump, DCSync, LLMNR/NBT-NS poisoning with Responder, M365 phishing landing pages.'
+    },
+    {
+      id: 'privilegeEscalation',
+      name: 'Privilege escalation',
+      count: PRIVESC_PROMPTS.length,
+      source: 'hand-rolled',
+      description:
+        'Linux: SUID abuse, sudo NOPASSWD misconfig, kernel exploits (DirtyPipe / OverlayFS), capability abuse, PATH hijacking, LD_PRELOAD, writable cron. Windows: fodhelper UAC bypass, SeImpersonate token impersonation (JuicyPotato / PrintSpoofer), AlwaysInstallElevated MSI. Container: Docker socket escape. Cloud: IAM PassRole / AssumeRole role chaining.'
     },
     {
       id: 'ssrf',
