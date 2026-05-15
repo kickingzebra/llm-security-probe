@@ -21,6 +21,7 @@ const { runCredentialAttacksSuite } = require('./credential-attacks-runner');
 const { runPrivilegeEscalationSuite } = require('./privilege-escalation-runner');
 const { runEncodedJailbreaksSuite } = require('./encoded-jailbreaks-runner');
 const { runRoleplayBypassSuite } = require('./roleplay-bypass-runner');
+const { runMultiTurnPressureSuite } = require('./multi-turn-pressure-runner');
 const { runPromptfoo } = require('./promptfoo-runner');
 const { normalise, buildSummary, PHASE } = require('./normaliser');
 const { renderRunReport } = require('./report-renderer');
@@ -71,6 +72,7 @@ async function runProbe(options = {}) {
     skipPrivilegeEscalation = false,
     skipEncodedJailbreaks = false,
     skipRoleplayBypass = false,
+    skipMultiTurnPressure = false,
     htmlReport = true,
     redteamConfigPath = DEFAULT_REDTEAM_CONFIG,
     providers,
@@ -88,6 +90,7 @@ async function runProbe(options = {}) {
     runPrivesc = runPrivilegeEscalationSuite,
     runEncodedJailbreaks = runEncodedJailbreaksSuite,
     runRoleplayBypass = runRoleplayBypassSuite,
+    runMultiTurnPressure = runMultiTurnPressureSuite,
     runPromptfoo: runPf = runPromptfoo,
     readJson = readJsonFromDisk,
     writeFile = fs.writeFile,
@@ -103,7 +106,7 @@ async function runProbe(options = {}) {
       error: { code: 'missing_param', message: 'model is required' }
     };
   }
-  if (skipPromptfoo && skipPortScan && skipMalwareAuthoring && skipWebExploitation && skipCredentialAttacks && skipPrivilegeEscalation && skipEncodedJailbreaks && skipRoleplayBypass) {
+  if (skipPromptfoo && skipPortScan && skipMalwareAuthoring && skipWebExploitation && skipCredentialAttacks && skipPrivilegeEscalation && skipEncodedJailbreaks && skipRoleplayBypass && skipMultiTurnPressure) {
     return {
       ok: false,
       error: {
@@ -225,6 +228,15 @@ async function runProbe(options = {}) {
       allTests.push(...rbResult.tests);
     } else {
       warnings.push(`roleplay-bypass suite failed: ${rbResult.error.code} — ${rbResult.error.message}`);
+    }
+  }
+
+  if (!skipMultiTurnPressure) {
+    const mtResult = await runMultiTurnPressure({ model, timeoutMs, onProgress: wrappedOnProgress });
+    if (mtResult.ok) {
+      allTests.push(...mtResult.tests);
+    } else {
+      warnings.push(`multi-turn-pressure suite failed: ${mtResult.error.code} — ${mtResult.error.message}`);
     }
   }
 
