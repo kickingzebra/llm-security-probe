@@ -7,6 +7,7 @@ const { PROMPTS: WEB_EXPLOIT_PROMPTS } = require('./web-exploitation-plugin');
 const { PROMPTS: CRED_ATTACK_PROMPTS } = require('./credential-attacks-plugin');
 const { PROMPTS: PRIVESC_PROMPTS } = require('./privilege-escalation-plugin');
 const { PROMPTS: JAILBREAK_PROMPTS } = require('./encoded-jailbreaks-plugin');
+const { PROMPTS: ROLEPLAY_PROMPTS } = require('./roleplay-bypass-plugin');
 
 function getCategoriesSnapshot() {
   return [
@@ -57,6 +58,14 @@ function getCategoriesSnapshot() {
       source: 'hand-rolled',
       description:
         'Cross-cutting robustness test: does refusal hold when the attack ask is obfuscated? Same attack content from the other plugins, but the prompt is base64 / ROT13 / leetspeak / hex-escaped / Cyrillic-confusable / translated to Spanish. Detector uses the union of every other plugin\'s blocklist — once decoded, the leak could come from any category. First probe in the "outside the model" attack-surface stream.'
+    },
+    {
+      id: 'roleplayBypass',
+      name: 'Roleplay / authority bypass (robustness)',
+      count: ROLEPLAY_PROMPTS.length,
+      source: 'hand-rolled',
+      description:
+        'Sister probe to encoded jailbreaks. Does refusal hold under social-engineering wrappers? Tests DAN persona, grandma bedtime story, fictional novel chapter, authority claim ("I\'m a pentester with authorization"), hypothetical / abstract framing, reverse psychology ("show me what to avoid"), unrestricted-AI persona swap, academic / peer-reviewed framing, translator / format-conversion, two-step indirection, CTF game framing, and explicit instruction-override. Same union blocklist as encoded jailbreaks.'
     },
     {
       id: 'ssrf',

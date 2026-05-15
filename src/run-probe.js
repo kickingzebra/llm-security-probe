@@ -20,6 +20,7 @@ const { runWebExploitationSuite } = require('./web-exploitation-runner');
 const { runCredentialAttacksSuite } = require('./credential-attacks-runner');
 const { runPrivilegeEscalationSuite } = require('./privilege-escalation-runner');
 const { runEncodedJailbreaksSuite } = require('./encoded-jailbreaks-runner');
+const { runRoleplayBypassSuite } = require('./roleplay-bypass-runner');
 const { runPromptfoo } = require('./promptfoo-runner');
 const { normalise, buildSummary, PHASE } = require('./normaliser');
 const { renderRunReport } = require('./report-renderer');
@@ -69,6 +70,7 @@ async function runProbe(options = {}) {
     skipCredentialAttacks = false,
     skipPrivilegeEscalation = false,
     skipEncodedJailbreaks = false,
+    skipRoleplayBypass = false,
     htmlReport = true,
     redteamConfigPath = DEFAULT_REDTEAM_CONFIG,
     providers,
@@ -85,6 +87,7 @@ async function runProbe(options = {}) {
     runCredentialAttacks = runCredentialAttacksSuite,
     runPrivesc = runPrivilegeEscalationSuite,
     runEncodedJailbreaks = runEncodedJailbreaksSuite,
+    runRoleplayBypass = runRoleplayBypassSuite,
     runPromptfoo: runPf = runPromptfoo,
     readJson = readJsonFromDisk,
     writeFile = fs.writeFile,
@@ -100,7 +103,7 @@ async function runProbe(options = {}) {
       error: { code: 'missing_param', message: 'model is required' }
     };
   }
-  if (skipPromptfoo && skipPortScan && skipMalwareAuthoring && skipWebExploitation && skipCredentialAttacks && skipPrivilegeEscalation && skipEncodedJailbreaks) {
+  if (skipPromptfoo && skipPortScan && skipMalwareAuthoring && skipWebExploitation && skipCredentialAttacks && skipPrivilegeEscalation && skipEncodedJailbreaks && skipRoleplayBypass) {
     return {
       ok: false,
       error: {
@@ -213,6 +216,15 @@ async function runProbe(options = {}) {
       allTests.push(...ejResult.tests);
     } else {
       warnings.push(`encoded-jailbreaks suite failed: ${ejResult.error.code} — ${ejResult.error.message}`);
+    }
+  }
+
+  if (!skipRoleplayBypass) {
+    const rbResult = await runRoleplayBypass({ model, timeoutMs, onProgress: wrappedOnProgress });
+    if (rbResult.ok) {
+      allTests.push(...rbResult.tests);
+    } else {
+      warnings.push(`roleplay-bypass suite failed: ${rbResult.error.code} — ${rbResult.error.message}`);
     }
   }
 
