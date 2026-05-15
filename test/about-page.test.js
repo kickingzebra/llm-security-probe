@@ -156,6 +156,15 @@ test('getCategoriesSnapshot: includes the privilege-escalation category', () => 
   assert.ok(pe.count >= 10, 'privilege-escalation should have at least 10 prompts');
 });
 
+test('getCategoriesSnapshot: includes the encoded-jailbreaks robustness category', () => {
+  const snap = getCategoriesSnapshot();
+  const ej = snap.find((c) => c.id === 'encodedJailbreaks');
+  assert.ok(ej, 'encoded-jailbreaks category must be present');
+  assert.equal(ej.source, 'hand-rolled');
+  assert.equal(typeof ej.count, 'number');
+  assert.ok(ej.count >= 10, 'encoded-jailbreaks should have at least 10 prompts');
+});
+
 test('getCategoriesSnapshot: includes the promptfoo-wrapped categories', () => {
   const snap = getCategoriesSnapshot();
   const ids = snap.map((c) => c.id);
