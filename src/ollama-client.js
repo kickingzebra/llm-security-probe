@@ -171,12 +171,133 @@ async function generate(options = {}) {
   return { ok: true, response: normaliseResponse(raw) };
 }
 
+function normaliseChatResponse(raw) {
+  return {
+    text: (raw && raw.message && raw.message.content) || '',
+    role: (raw && raw.message && raw.message.role) || 'assistant',
+    model: raw && raw.model,
+    createdAt: raw && raw.created_at,
+    done: !!(raw && raw.done),
+    totalDurationNs: (raw && raw.total_duration) || 0,
+    evalCount: (raw && raw.eval_count) || 0,
+    evalDurationNs: (raw && raw.eval_duration) || 0
+  };
+}
+
+/**
+ * POST /api/chat — multi-turn variant that accepts a `messages` array of
+ * { role: 'user'|'assistant'|'system', content: string } records. Used by
+ * the multi-turn-pressure runner (PR-A31) to keep conversation state across
+ * follow-up turns.
+ *
+ * Same discriminated-union return shape as generate().
+ */
+async function chat(options = {}) {
+  const {
+    model,
+    messages,
+    options: modelOptions,
+    baseUrl = DEFAULT_BASE_URL,
+    fetchImpl = globalThis.fetch,
+    timeoutMs = DEFAULT_TIMEOUT_MS
+  } = options;
+
+  if (!model) {
+    return {
+      ok: false,
+      error: { code: 'missing_param', message: 'model is required' }
+    };
+  }
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return {
+      ok: false,
+      error: { code: 'missing_param', message: 'messages (non-empty array) is required' }
+    };
+  }
+  if (typeof fetchImpl !== 'function') {
+    return {
+      ok: false,
+      error: {
+        code: 'no_fetch',
+        message: 'No fetch implementation available; pass fetchImpl explicitly'
+      }
+    };
+  }
+
+  const body = {
+    model,
+    messages,
+    stream: false,
+    options: { num_predict: DEFAULT_NUM_PREDICT, ...(modelOptions || {}) }
+  };
+
+  const url = `${baseUrl}/api/chat`;
+  const controller = new AbortController();
+  const timeoutHandle =
+    timeoutMs > 0 && Number.isFinite(timeoutMs)
+      ? setTimeout(() => controller.abort(), timeoutMs)
+      : null;
+
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+  } catch (err) {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+    return { ok: false, error: classifyFetchError(err) };
+  }
+  if (timeoutHandle) clearTimeout(timeoutHandle);
+
+  if (response.status === 404) {
+    return {
+      ok: false,
+      error: {
+        code: 'not_found',
+        status: 404,
+        message: 'Ollama /api/chat returned 404 — wrong base URL or model unknown?'
+      }
+    };
+  }
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      error: {
+        code: 'unexpected_status',
+        status: response.status,
+        message: `Ollama /api/chat returned unexpected status ${response.status}`
+      }
+    };
+  }
+
+  let raw;
+  try {
+    raw = await response.json();
+  } catch (err) {
+    return {
+      ok: false,
+      error: {
+        code: 'invalid_json',
+        message: `Failed to parse JSON from /api/chat: ${(err && err.message) || err}`
+      }
+    };
+  }
+
+  return { ok: true, response: normaliseChatResponse(raw) };
+}
+
 module.exports = {
   generate,
+  chat,
   DEFAULT_BASE_URL,
   DEFAULT_TIMEOUT_MS,
   DEFAULT_NUM_PREDICT,
   // exported for tests
   normaliseResponse,
+  normaliseChatResponse,
   classifyFetchError
 };
