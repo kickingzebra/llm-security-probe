@@ -27,7 +27,8 @@ const PLUGIN_CATEGORY_MAP = Object.freeze({
   'privilege-escalation': 'privilegeEscalation',
   'encoded-jailbreaks': 'encodedJailbreaks',
   'roleplay-bypass': 'roleplayBypass',
-  'multi-turn-pressure': 'multiTurnPressure'
+  'multi-turn-pressure': 'multiTurnPressure',
+  'indirect-injection': 'indirectInjection'
 });
 
 const PHASE = '1A-defensive-eval';

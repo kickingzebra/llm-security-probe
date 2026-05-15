@@ -183,6 +183,15 @@ test('getCategoriesSnapshot: includes the multi-turn-pressure robustness categor
   assert.ok(mt.count >= 10, 'multi-turn-pressure should have at least 10 prompts');
 });
 
+test('getCategoriesSnapshot: includes the indirect-injection category', () => {
+  const snap = getCategoriesSnapshot();
+  const ii = snap.find((c) => c.id === 'indirectInjection');
+  assert.ok(ii, 'indirect-injection category must be present');
+  assert.equal(ii.source, 'hand-rolled');
+  assert.equal(typeof ii.count, 'number');
+  assert.ok(ii.count >= 10, 'indirect-injection should have at least 10 prompts');
+});
+
 test('getCategoriesSnapshot: includes the promptfoo-wrapped categories', () => {
   const snap = getCategoriesSnapshot();
   const ids = snap.map((c) => c.id);

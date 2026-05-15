@@ -22,6 +22,7 @@ const { runPrivilegeEscalationSuite } = require('./privilege-escalation-runner')
 const { runEncodedJailbreaksSuite } = require('./encoded-jailbreaks-runner');
 const { runRoleplayBypassSuite } = require('./roleplay-bypass-runner');
 const { runMultiTurnPressureSuite } = require('./multi-turn-pressure-runner');
+const { runIndirectInjectionSuite } = require('./indirect-injection-runner');
 const { runPromptfoo } = require('./promptfoo-runner');
 const { normalise, buildSummary, PHASE } = require('./normaliser');
 const { renderRunReport } = require('./report-renderer');
@@ -73,6 +74,7 @@ async function runProbe(options = {}) {
     skipEncodedJailbreaks = false,
     skipRoleplayBypass = false,
     skipMultiTurnPressure = false,
+    skipIndirectInjection = false,
     htmlReport = true,
     redteamConfigPath = DEFAULT_REDTEAM_CONFIG,
     providers,
@@ -91,6 +93,7 @@ async function runProbe(options = {}) {
     runEncodedJailbreaks = runEncodedJailbreaksSuite,
     runRoleplayBypass = runRoleplayBypassSuite,
     runMultiTurnPressure = runMultiTurnPressureSuite,
+    runIndirectInjection = runIndirectInjectionSuite,
     runPromptfoo: runPf = runPromptfoo,
     readJson = readJsonFromDisk,
     writeFile = fs.writeFile,
@@ -106,7 +109,7 @@ async function runProbe(options = {}) {
       error: { code: 'missing_param', message: 'model is required' }
     };
   }
-  if (skipPromptfoo && skipPortScan && skipMalwareAuthoring && skipWebExploitation && skipCredentialAttacks && skipPrivilegeEscalation && skipEncodedJailbreaks && skipRoleplayBypass && skipMultiTurnPressure) {
+  if (skipPromptfoo && skipPortScan && skipMalwareAuthoring && skipWebExploitation && skipCredentialAttacks && skipPrivilegeEscalation && skipEncodedJailbreaks && skipRoleplayBypass && skipMultiTurnPressure && skipIndirectInjection) {
     return {
       ok: false,
       error: {
@@ -237,6 +240,15 @@ async function runProbe(options = {}) {
       allTests.push(...mtResult.tests);
     } else {
       warnings.push(`multi-turn-pressure suite failed: ${mtResult.error.code} — ${mtResult.error.message}`);
+    }
+  }
+
+  if (!skipIndirectInjection) {
+    const iiResult = await runIndirectInjection({ model, timeoutMs, onProgress: wrappedOnProgress });
+    if (iiResult.ok) {
+      allTests.push(...iiResult.tests);
+    } else {
+      warnings.push(`indirect-injection suite failed: ${iiResult.error.code} — ${iiResult.error.message}`);
     }
   }
 
