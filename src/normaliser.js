@@ -22,7 +22,8 @@ const PLUGIN_CATEGORY_MAP = Object.freeze({
   'coding-agent:secret-file-read': 'tokenLeak',
   'port-scan': 'portScan',
   'malware-authoring': 'malwareAuthoring',
-  'web-exploitation': 'webExploitation'
+  'web-exploitation': 'webExploitation',
+  'credential-attacks': 'credentialAttacks'
 });
 
 const PHASE = '1A-defensive-eval';
