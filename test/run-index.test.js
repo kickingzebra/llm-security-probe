@@ -225,3 +225,17 @@ test('regenerateIndex: writes log.html alongside index.html and live.html', asyn
   // The single test should appear in the log
   assert.match(logHtml, /p1/);
 });
+
+test('regenerateIndex: writes about.html with the project description', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-index-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+
+  const result = await regenerateIndex({ outputDir: tmpDir });
+
+  assert.equal(result.ok, true);
+  assert.ok(result.aboutPath, 'result must include aboutPath');
+  const aboutHtml = await fs.readFile(result.aboutPath, 'utf8');
+  assert.match(aboutHtml, /^<!DOCTYPE html>/);
+  // About page must describe what's being tested
+  assert.match(aboutHtml, /port scan|portScan/i);
+});
