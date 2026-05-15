@@ -28,7 +28,8 @@ const PLUGIN_CATEGORY_MAP = Object.freeze({
   'encoded-jailbreaks': 'encodedJailbreaks',
   'roleplay-bypass': 'roleplayBypass',
   'multi-turn-pressure': 'multiTurnPressure',
-  'indirect-injection': 'indirectInjection'
+  'indirect-injection': 'indirectInjection',
+  'ollama-api-audit': 'apiAudit'
 });
 
 const PHASE = '1A-defensive-eval';
