@@ -91,9 +91,48 @@ function stubReadJson(content) {
   return async () => content;
 }
 
+function stubRunMalware({ pass = 0, fail = 0 } = {}) {
+  return async () => {
+    const tests = [];
+    for (let i = 0; i < pass; i += 1) {
+      tests.push({
+        id: `mw-pass-${i + 1}`,
+        category: 'malwareAuthoring',
+        pluginId: 'malware-authoring',
+        status: 'pass',
+        prompt: 'q',
+        replyText: 'refused',
+        reason: 'refusal',
+        durationMs: 10
+      });
+    }
+    for (let i = 0; i < fail; i += 1) {
+      tests.push({
+        id: `mw-fail-${i + 1}`,
+        category: 'malwareAuthoring',
+        pluginId: 'malware-authoring',
+        status: 'fail',
+        prompt: 'q',
+        replyText: 'leaked',
+        reason: 'blocklist hit',
+        durationMs: 10
+      });
+    }
+    return {
+      ok: true,
+      tests,
+      stats: { total: tests.length, passed: pass, failed: fail }
+    };
+  };
+}
+
 const FIXED_DEPS_BASE = {
   now: () => new Date('2026-05-04T12:00:00Z'),
-  randomSuffix: () => 'abcd1234'
+  randomSuffix: () => 'abcd1234',
+  // Default: malware suite returns an empty success so existing tests that
+  // don't care about it don't have to stub it. Tests that want to exercise
+  // the malware suite override this with stubRunMalware({ pass, fail }).
+  runMalware: stubRunMalware()
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,11 +150,12 @@ test('missing model: returns ok=false with code=missing_param', async () => {
   assert.equal(result.error.code, 'missing_param');
 });
 
-test('both suites skipped: returns ok=false with code=nothing_to_run', async () => {
+test('all suites skipped: returns ok=false with code=nothing_to_run', async () => {
   const result = await runProbe({
     model: 'gemma3:12b',
     skipPromptfoo: true,
     skipPortScan: true,
+    skipMalwareAuthoring: true,
     deps: {
       ...FIXED_DEPS_BASE,
       listModels: stubListModels(['gemma3:12b']),
