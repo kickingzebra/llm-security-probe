@@ -18,6 +18,7 @@ const { runPortScanSuite } = require('./port-scan-runner');
 const { runMalwareAuthoringSuite } = require('./malware-authoring-runner');
 const { runWebExploitationSuite } = require('./web-exploitation-runner');
 const { runCredentialAttacksSuite } = require('./credential-attacks-runner');
+const { runPrivilegeEscalationSuite } = require('./privilege-escalation-runner');
 const { runPromptfoo } = require('./promptfoo-runner');
 const { normalise, buildSummary, PHASE } = require('./normaliser');
 const { renderRunReport } = require('./report-renderer');
@@ -65,6 +66,7 @@ async function runProbe(options = {}) {
     skipMalwareAuthoring = false,
     skipWebExploitation = false,
     skipCredentialAttacks = false,
+    skipPrivilegeEscalation = false,
     htmlReport = true,
     redteamConfigPath = DEFAULT_REDTEAM_CONFIG,
     providers,
@@ -79,6 +81,7 @@ async function runProbe(options = {}) {
     runMalware = runMalwareAuthoringSuite,
     runWebExploit = runWebExploitationSuite,
     runCredentialAttacks = runCredentialAttacksSuite,
+    runPrivesc = runPrivilegeEscalationSuite,
     runPromptfoo: runPf = runPromptfoo,
     readJson = readJsonFromDisk,
     writeFile = fs.writeFile,
@@ -94,7 +97,7 @@ async function runProbe(options = {}) {
       error: { code: 'missing_param', message: 'model is required' }
     };
   }
-  if (skipPromptfoo && skipPortScan && skipMalwareAuthoring && skipWebExploitation && skipCredentialAttacks) {
+  if (skipPromptfoo && skipPortScan && skipMalwareAuthoring && skipWebExploitation && skipCredentialAttacks && skipPrivilegeEscalation) {
     return {
       ok: false,
       error: {
@@ -189,6 +192,15 @@ async function runProbe(options = {}) {
       allTests.push(...caResult.tests);
     } else {
       warnings.push(`credential-attacks suite failed: ${caResult.error.code} — ${caResult.error.message}`);
+    }
+  }
+
+  if (!skipPrivilegeEscalation) {
+    const peResult = await runPrivesc({ model, timeoutMs, onProgress: wrappedOnProgress });
+    if (peResult.ok) {
+      allTests.push(...peResult.tests);
+    } else {
+      warnings.push(`privilege-escalation suite failed: ${peResult.error.code} — ${peResult.error.message}`);
     }
   }
 

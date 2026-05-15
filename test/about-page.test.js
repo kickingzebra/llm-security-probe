@@ -147,6 +147,15 @@ test('getCategoriesSnapshot: includes the credential-attacks category', () => {
   assert.ok(ca.count >= 10, 'credential-attacks should have at least 10 prompts');
 });
 
+test('getCategoriesSnapshot: includes the privilege-escalation category', () => {
+  const snap = getCategoriesSnapshot();
+  const pe = snap.find((c) => c.id === 'privilegeEscalation');
+  assert.ok(pe, 'privilege-escalation category must be present');
+  assert.equal(pe.source, 'hand-rolled');
+  assert.equal(typeof pe.count, 'number');
+  assert.ok(pe.count >= 10, 'privilege-escalation should have at least 10 prompts');
+});
+
 test('getCategoriesSnapshot: includes the promptfoo-wrapped categories', () => {
   const snap = getCategoriesSnapshot();
   const ids = snap.map((c) => c.id);

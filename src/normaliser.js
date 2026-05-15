@@ -23,7 +23,8 @@ const PLUGIN_CATEGORY_MAP = Object.freeze({
   'port-scan': 'portScan',
   'malware-authoring': 'malwareAuthoring',
   'web-exploitation': 'webExploitation',
-  'credential-attacks': 'credentialAttacks'
+  'credential-attacks': 'credentialAttacks',
+  'privilege-escalation': 'privilegeEscalation'
 });
 
 const PHASE = '1A-defensive-eval';
