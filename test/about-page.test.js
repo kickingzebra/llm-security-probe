@@ -192,6 +192,15 @@ test('getCategoriesSnapshot: includes the indirect-injection category', () => {
   assert.ok(ii.count >= 10, 'indirect-injection should have at least 10 prompts');
 });
 
+test('getCategoriesSnapshot: includes the apiAudit deployment-posture category', () => {
+  const snap = getCategoriesSnapshot();
+  const aa = snap.find((c) => c.id === 'apiAudit');
+  assert.ok(aa, 'apiAudit category must be present');
+  assert.equal(aa.source, 'hand-rolled');
+  assert.equal(typeof aa.count, 'number');
+  assert.ok(aa.count >= 8, 'apiAudit should have at least 8 checks');
+});
+
 test('getCategoriesSnapshot: includes the promptfoo-wrapped categories', () => {
   const snap = getCategoriesSnapshot();
   const ids = snap.map((c) => c.id);

@@ -23,6 +23,7 @@ const { runEncodedJailbreaksSuite } = require('./encoded-jailbreaks-runner');
 const { runRoleplayBypassSuite } = require('./roleplay-bypass-runner');
 const { runMultiTurnPressureSuite } = require('./multi-turn-pressure-runner');
 const { runIndirectInjectionSuite } = require('./indirect-injection-runner');
+const { runOllamaApiAuditSuite } = require('./ollama-api-audit-runner');
 const { runPromptfoo } = require('./promptfoo-runner');
 const { normalise, buildSummary, PHASE } = require('./normaliser');
 const { renderRunReport } = require('./report-renderer');
@@ -75,6 +76,7 @@ async function runProbe(options = {}) {
     skipRoleplayBypass = false,
     skipMultiTurnPressure = false,
     skipIndirectInjection = false,
+    skipOllamaApiAudit = false,
     htmlReport = true,
     redteamConfigPath = DEFAULT_REDTEAM_CONFIG,
     providers,
@@ -94,6 +96,7 @@ async function runProbe(options = {}) {
     runRoleplayBypass = runRoleplayBypassSuite,
     runMultiTurnPressure = runMultiTurnPressureSuite,
     runIndirectInjection = runIndirectInjectionSuite,
+    runOllamaApiAudit = runOllamaApiAuditSuite,
     runPromptfoo: runPf = runPromptfoo,
     readJson = readJsonFromDisk,
     writeFile = fs.writeFile,
@@ -109,7 +112,7 @@ async function runProbe(options = {}) {
       error: { code: 'missing_param', message: 'model is required' }
     };
   }
-  if (skipPromptfoo && skipPortScan && skipMalwareAuthoring && skipWebExploitation && skipCredentialAttacks && skipPrivilegeEscalation && skipEncodedJailbreaks && skipRoleplayBypass && skipMultiTurnPressure && skipIndirectInjection) {
+  if (skipPromptfoo && skipPortScan && skipMalwareAuthoring && skipWebExploitation && skipCredentialAttacks && skipPrivilegeEscalation && skipEncodedJailbreaks && skipRoleplayBypass && skipMultiTurnPressure && skipIndirectInjection && skipOllamaApiAudit) {
     return {
       ok: false,
       error: {
@@ -249,6 +252,16 @@ async function runProbe(options = {}) {
       allTests.push(...iiResult.tests);
     } else {
       warnings.push(`indirect-injection suite failed: ${iiResult.error.code} — ${iiResult.error.message}`);
+    }
+  }
+
+  if (!skipOllamaApiAudit) {
+    // The API audit probes the server, not the model — model param ignored.
+    const oaResult = await runOllamaApiAudit({ timeoutMs, onProgress: wrappedOnProgress });
+    if (oaResult.ok) {
+      allTests.push(...oaResult.tests);
+    } else {
+      warnings.push(`ollama-api-audit suite failed: ${oaResult.error.code} — ${oaResult.error.message}`);
     }
   }
 
