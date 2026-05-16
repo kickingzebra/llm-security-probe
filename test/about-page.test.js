@@ -208,3 +208,112 @@ test('getCategoriesSnapshot: includes the promptfoo-wrapped categories', () => {
   assert.ok(ids.includes('ssrf'));
   assert.ok(ids.includes('tokenLeak'));
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PR-A35: per-category test details on the about page
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('getCategoriesSnapshot: hand-rolled categories include example prompts', () => {
+  const snap = getCategoriesSnapshot();
+  const handRolled = snap.filter((c) => c.source === 'hand-rolled');
+  assert.ok(handRolled.length >= 5, 'expected at least 5 hand-rolled categories');
+  for (const c of handRolled) {
+    assert.ok(Array.isArray(c.examples), `category "${c.id}" must expose examples[]`);
+    assert.ok(c.examples.length >= 1 && c.examples.length <= 4,
+      `category "${c.id}" should expose 1-4 example prompts, got ${c.examples.length}`);
+    for (const ex of c.examples) {
+      assert.equal(typeof ex.id, 'string');
+      assert.equal(typeof ex.prompt, 'string');
+      assert.ok(ex.prompt.length > 0, `example ${ex.id} must have non-empty prompt text`);
+    }
+  }
+});
+
+test('getCategoriesSnapshot: hand-rolled categories carry a detectorNote describing pass/fail logic', () => {
+  const snap = getCategoriesSnapshot();
+  const handRolled = snap.filter((c) => c.source === 'hand-rolled');
+  for (const c of handRolled) {
+    assert.equal(typeof c.detectorNote, 'string',
+      `category "${c.id}" must carry a detectorNote string`);
+    assert.ok(c.detectorNote.length > 20,
+      `category "${c.id}" detectorNote should be a real sentence, got "${c.detectorNote}"`);
+  }
+});
+
+test('getCategoriesSnapshot: promptfoo categories do NOT carry examples (configured upstream)', () => {
+  const snap = getCategoriesSnapshot();
+  const wrapped = snap.filter((c) => c.source !== 'hand-rolled');
+  for (const c of wrapped) {
+    assert.ok(!c.examples || c.examples.length === 0,
+      `promptfoo category "${c.id}" should not carry hand-curated examples`);
+  }
+});
+
+test('renderAboutPage: renders a "Test details" section with one block per hand-rolled category', () => {
+  const html = renderAboutPage();
+  assert.match(html, /test details|how each test works|per[- ]?test/i,
+    'expected a "Test details" / "How each test works" heading');
+
+  // Every hand-rolled category id should appear as an anchor / block id
+  const snap = getCategoriesSnapshot();
+  const handRolled = snap.filter((c) => c.source === 'hand-rolled');
+  for (const c of handRolled) {
+    const idPattern = new RegExp(`id="test-${c.id}"|data-test-id="${c.id}"`);
+    assert.match(html, idPattern, `expected a per-test block for ${c.id}`);
+  }
+});
+
+test('renderAboutPage: per-test blocks use <details> for collapsibility', () => {
+  const html = renderAboutPage();
+  // Each per-test block should be a <details> element so the page stays
+  // browsable for the 10 hand-rolled categories.
+  const detailsBlocks = (html.match(/<details\b[^>]*class="[^"]*test-block[^"]*"/g) || []).length;
+  assert.ok(detailsBlocks >= 5,
+    `expected >=5 collapsible <details class="test-block"> entries, got ${detailsBlocks}`);
+});
+
+test('renderAboutPage: per-test block surfaces at least one example prompt text', () => {
+  const html = renderAboutPage();
+  const snap = getCategoriesSnapshot();
+  // For a known plugin (port-scan), one of its prompt ids should appear in the page
+  const portScan = snap.find((c) => c.id === 'portScan');
+  const firstExample = portScan.examples[0];
+  // The example's id should appear inside the rendered block
+  assert.ok(html.includes(firstExample.id),
+    `expected example id "${firstExample.id}" to appear in the rendered about page`);
+});
+
+test('renderAboutPage: per-test block HTML-escapes example prompt text (XSS guard)', () => {
+  const html = renderAboutPage({
+    categories: [{
+      id: 'fakeCat',
+      name: 'Fake category',
+      count: 1,
+      source: 'hand-rolled',
+      description: 'desc',
+      detectorNote: 'detector note',
+      examples: [{
+        id: 'xss-test',
+        prompt: '<script>alert(1)</script>'
+      }]
+    }]
+  });
+  assert.ok(!/<script>alert\(1\)<\/script>/.test(html),
+    'raw <script> from example prompt must be escaped');
+  assert.match(html, /&lt;script&gt;alert\(1\)/);
+});
+
+test('renderAboutPage: per-test block surfaces the detectorNote', () => {
+  const html = renderAboutPage({
+    categories: [{
+      id: 'demoCat',
+      name: 'Demo',
+      count: 0,
+      source: 'hand-rolled',
+      description: 'd',
+      detectorNote: 'PASS-when-refusal-and-no-blocklist; FAIL on command-shape override.',
+      examples: []
+    }]
+  });
+  assert.match(html, /PASS-when-refusal-and-no-blocklist/);
+});
