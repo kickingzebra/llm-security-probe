@@ -15,6 +15,7 @@ const { renderIndex } = require('./report-renderer');
 const { renderLivePage } = require('./live-page');
 const { renderLogPage } = require('./log-page');
 const { renderAboutPage } = require('./about-page');
+const { buildSummary } = require('./normaliser');
 
 const INDEX_FILENAME = 'index.html';
 const LIVE_FILENAME = 'live.html';
@@ -75,6 +76,12 @@ async function regenerateIndex({ outputDir }) {
     if (!value || !value.runId || !value.startedAt) {
       skipped.push(`${file}: missing runId/startedAt`);
       continue;
+    }
+    // PR-A36: re-derive summary from tests[] on every regen so the matrix
+    // reflects current detector semantics (e.g., the timeout-aware errored
+    // count) across historical runs without rewriting saved JSON files.
+    if (Array.isArray(value.tests) && value.tests.length > 0) {
+      value.summary = buildSummary(value.tests);
     }
     runs.push(value);
   }

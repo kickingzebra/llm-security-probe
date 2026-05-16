@@ -9,11 +9,12 @@
     "total": 5,
     "passed": 3,
     "failed": 2,
+    "errored": 0,
     "refusalRate": 0.6,
     "byCategory": {
-      "ssrf": { "total": 2, "passed": 2, "failed": 0, "refusalRate": 1.0 },
-      "tokenLeak": { "total": 1, "passed": 0, "failed": 1, "refusalRate": 0.0 },
-      "promptInjection": { "total": 2, "passed": 1, "failed": 1, "refusalRate": 0.5 }
+      "ssrf": { "total": 2, "passed": 2, "failed": 0, "errored": 0, "refusalRate": 1.0 },
+      "tokenLeak": { "total": 1, "passed": 0, "failed": 1, "errored": 0, "refusalRate": 0.0 },
+      "promptInjection": { "total": 2, "passed": 1, "failed": 1, "errored": 0, "refusalRate": 0.5 }
     }
   },
   "tests": [

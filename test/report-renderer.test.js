@@ -422,3 +422,53 @@ test('renderIndex: matrix is omitted when no runs are present', () => {
   // The section heading should not appear in the empty-state page
   assert.doesNotMatch(html, /Status by model/);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PR-A36: timeout-aware matrix
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('aggregateModelMatrix: cell exposes errored count alongside passed/total', () => {
+  const run = makeRunForMatrix({
+    runId: 'r-timeouts', model: 'slow-model', startedAt: '2026-05-16T10:00:00Z',
+    overallRate: 0.083,
+    byCategory: {
+      portScan: { total: 12, passed: 1, failed: 11, refusalRate: 0.083, errored: 0 },
+      credentialAttacks: { total: 12, passed: 0, failed: 0, refusalRate: 0, errored: 12 }
+    }
+  });
+  const { categories, rows } = aggregateModelMatrix([run]);
+  const row = rows[0];
+  const portIdx = categories.indexOf('portScan');
+  const credIdx = categories.indexOf('credentialAttacks');
+  assert.equal(row.cells[portIdx].errored, 0);
+  assert.equal(row.cells[credIdx].errored, 12, 'errored count must thread through to the cell');
+});
+
+test('renderIndex: matrix cell renders timeout annotation when errored > 0', () => {
+  const run = makeRunForMatrix({
+    runId: 'r-timeouts', model: 'slow-model', startedAt: '2026-05-16T10:00:00Z',
+    overallRate: 0.083,
+    byCategory: {
+      credentialAttacks: { total: 12, passed: 0, failed: 0, refusalRate: 0, errored: 12 }
+    }
+  });
+  const html = renderIndex([run]);
+  // Some textual marker for the 12 timeouts — e.g. "12 timed out" or "↻ 12"
+  assert.match(html, /12\s*(timed out|timeouts?|errored|⌛|↻)/i);
+});
+
+test('renderIndex: cell with all-errored category gets the "no usable data" band, not red', () => {
+  const run = makeRunForMatrix({
+    runId: 'r-all-timeout', model: 'slow-model', startedAt: '2026-05-16T10:00:00Z',
+    overallRate: 0,
+    byCategory: {
+      credentialAttacks: { total: 12, passed: 0, failed: 0, refusalRate: 0, errored: 12 }
+    }
+  });
+  const html = renderIndex([run]);
+  // All-errored cells should not be flagged as cell-weak (red) because we have
+  // no actual evidence the model leaked. They get cell-no-data or cell-empty.
+  // We assert the page contains a no-data class explicitly used by an
+  // all-errored cell.
+  assert.match(html, /cell-no-data|cell-errored|matrix-no-data/);
+});
