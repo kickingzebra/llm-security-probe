@@ -208,7 +208,8 @@ function aggregateModelMatrix(runs) {
         return {
           rate: typeof b.refusalRate === 'number' ? b.refusalRate : null,
           passed: b.passed || 0,
-          total: b.total || 0
+          total: b.total || 0,
+          errored: b.errored || 0
         };
       })
     }))
@@ -233,12 +234,27 @@ function renderMatrixCell(cell) {
   if (!cell) {
     return '<td class="matrix-cell cell-empty"><span class="cell-text">—</span></td>';
   }
+  const errored = cell.errored || 0;
+  const completed = (cell.passed || 0) + Math.max(0, (cell.total || 0) - (cell.passed || 0) - errored);
+  // If EVERY test was an infrastructure error, we have no real data — render
+  // a distinct band rather than misleadingly showing "0% refused" in red.
+  if (errored > 0 && completed === 0) {
+    return [
+      '<td class="matrix-cell cell-no-data">',
+      '<span class="cell-pct">no data</span>',
+      `<span class="cell-frac">${escapeHtml(errored)} timed out</span>`,
+      '</td>'
+    ].join('');
+  }
   const cls = bandClass(cell.rate);
   const pctLabel = pct(cell.rate);
+  const fracLine = errored > 0
+    ? `<span class="cell-frac">${escapeHtml(cell.passed)} / ${escapeHtml(completed)} <span class="cell-err">(${escapeHtml(errored)} timed out)</span></span>`
+    : `<span class="cell-frac">${escapeHtml(cell.passed)} / ${escapeHtml(cell.total)}</span>`;
   return [
     `<td class="matrix-cell ${cls}">`,
     `<span class="cell-pct">${pctLabel}</span>`,
-    `<span class="cell-frac">${escapeHtml(cell.passed)} / ${escapeHtml(cell.total)}</span>`,
+    fracLine,
     '</td>'
   ].join('');
 }
@@ -275,7 +291,8 @@ function renderModelMatrix(runs) {
     '<span class="legend-pill cell-strong">&ge; 80% refused</span> ',
     '<span class="legend-pill cell-mixed">40&ndash;79%</span> ',
     '<span class="legend-pill cell-weak">&lt; 40%</span> ',
-    '<span class="legend-pill cell-empty">no data</span>',
+    '<span class="legend-pill cell-no-data">timed out (no usable data)</span> ',
+    '<span class="legend-pill cell-empty">not tested</span>',
     '</p>'
   ].join('');
 
@@ -362,6 +379,9 @@ table.model-matrix td.matrix-link code { font-size: 0.85em; }
 .cell-weak .cell-pct { color: #721c24; }
 .cell-empty { background: var(--neutral-bg); color: var(--muted); }
 .cell-empty .cell-text { font-style: italic; }
+.cell-no-data { background: repeating-linear-gradient(45deg, var(--neutral-bg), var(--neutral-bg) 6px, #eef0f2 6px, #eef0f2 12px); color: var(--muted); }
+.cell-no-data .cell-pct { color: var(--muted); font-style: italic; font-weight: 500; }
+.cell-err { color: var(--muted); font-size: 0.9em; }
 `;
 
 // ─────────────────────────────────────────────────────────────────────────────

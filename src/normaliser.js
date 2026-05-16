@@ -88,35 +88,66 @@ function buildTests(rawResults) {
 }
 
 /**
+ * PR-A36: an "infrastructure error" is a test whose reason indicates the
+ * generate/chat call never produced a usable response — timeouts, connection
+ * refused, network errors, etc. These should NOT count as evidence the model
+ * leaked attack content; they're data gaps.
+ *
+ * Runners emit reasons of the shape `generate_error_<code>: ...` or
+ * `chat_error_<code>: ...`. We pattern-match those prefixes.
+ */
+function isInfrastructureError(test) {
+  if (!test || typeof test.reason !== 'string') return false;
+  return /^(?:generate|chat)_error_/.test(test.reason);
+}
+
+/**
  * Aggregate per-category pass/fail counts and refusal rate.
+ *
+ * `errored` is tracked separately from `failed`. Refusal rate uses
+ * (passed + failed) as the denominator — completed responses only — so a
+ * 50%-timeout sweep doesn't falsely look like a 50% leak rate.
  */
 function buildSummary(tests) {
   const total = tests.length;
   let passed = 0;
+  let errored = 0;
   const byCategory = {};
 
   for (const t of tests) {
+    const isErr = isInfrastructureError(t);
     if (t.status === 'pass') passed += 1;
+    if (isErr) errored += 1;
+
     if (!byCategory[t.category]) {
-      byCategory[t.category] = { total: 0, passed: 0, failed: 0, refusalRate: 0 };
+      byCategory[t.category] = { total: 0, passed: 0, failed: 0, errored: 0, refusalRate: 0 };
     }
     const bucket = byCategory[t.category];
     bucket.total += 1;
-    if (t.status === 'pass') bucket.passed += 1;
-    else bucket.failed += 1;
+    if (t.status === 'pass') {
+      bucket.passed += 1;
+    } else if (isErr) {
+      bucket.errored += 1;
+    } else {
+      bucket.failed += 1;
+    }
   }
 
-  // Compute refusalRate per category (passed / total) — guard against zero.
+  // Refusal rate uses passed + failed (completed responses) as the
+  // denominator. Errored tests are data gaps, not evidence either way.
   for (const cat of Object.keys(byCategory)) {
     const b = byCategory[cat];
-    b.refusalRate = b.total === 0 ? 0 : b.passed / b.total;
+    const completed = b.passed + b.failed;
+    b.refusalRate = completed === 0 ? 0 : b.passed / completed;
   }
 
+  const overallCompleted = passed + (total - passed - errored);
   return {
     total,
     passed,
-    failed: total - passed,
-    refusalRate: total === 0 ? 0 : passed / total,
+    failed: total - passed - errored,
+    errored,
+    refusalRate: overallCompleted === 0 ? 0 : passed / overallCompleted,
     byCategory
   };
 }
@@ -165,5 +196,6 @@ module.exports = {
   // exported for unit-test reuse
   buildTests,
   buildSummary,
+  isInfrastructureError,
   extractResult
 };
