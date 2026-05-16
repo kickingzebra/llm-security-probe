@@ -170,6 +170,130 @@ function renderIndexRow(run) {
   ].join('');
 }
 
+/**
+ * Collapse an array of runs into a one-row-per-model matrix using the latest
+ * run for each model. Categories is the union across those latest runs.
+ * Returns { categories, rows } — pure, no I/O.
+ */
+function aggregateModelMatrix(runs) {
+  const list = Array.isArray(runs) ? runs : [];
+
+  const latestByModel = new Map();
+  for (const r of list) {
+    const m = r && r.model ? r.model : 'unknown';
+    const existing = latestByModel.get(m);
+    if (!existing || String(r.startedAt || '') > String(existing.startedAt || '')) {
+      latestByModel.set(m, r);
+    }
+  }
+
+  const catSet = new Set();
+  for (const r of latestByModel.values()) {
+    const byCat = (r.summary && r.summary.byCategory) || {};
+    for (const c of Object.keys(byCat)) catSet.add(c);
+  }
+  const categories = [...catSet].sort();
+
+  const rows = [...latestByModel.entries()]
+    .map(([model, run]) => ({
+      model,
+      runId: run.runId,
+      startedAt: run.startedAt,
+      overall: run.summary && typeof run.summary.refusalRate === 'number'
+        ? run.summary.refusalRate
+        : null,
+      cells: categories.map((cat) => {
+        const b = run.summary && run.summary.byCategory && run.summary.byCategory[cat];
+        if (!b) return null;
+        return {
+          rate: typeof b.refusalRate === 'number' ? b.refusalRate : null,
+          passed: b.passed || 0,
+          total: b.total || 0
+        };
+      })
+    }))
+    .sort((a, b) => {
+      const ta = String(a.startedAt || '');
+      const tb = String(b.startedAt || '');
+      if (ta !== tb) return tb.localeCompare(ta);
+      return String(a.model).localeCompare(String(b.model));
+    });
+
+  return { categories, rows };
+}
+
+function bandClass(rate) {
+  if (typeof rate !== 'number' || Number.isNaN(rate)) return 'cell-empty';
+  if (rate >= 0.8) return 'cell-strong';
+  if (rate >= 0.4) return 'cell-mixed';
+  return 'cell-weak';
+}
+
+function renderMatrixCell(cell) {
+  if (!cell) {
+    return '<td class="matrix-cell cell-empty"><span class="cell-text">—</span></td>';
+  }
+  const cls = bandClass(cell.rate);
+  const pctLabel = pct(cell.rate);
+  return [
+    `<td class="matrix-cell ${cls}">`,
+    `<span class="cell-pct">${pctLabel}</span>`,
+    `<span class="cell-frac">${escapeHtml(cell.passed)} / ${escapeHtml(cell.total)}</span>`,
+    '</td>'
+  ].join('');
+}
+
+function renderModelMatrix(runs) {
+  const { categories, rows } = aggregateModelMatrix(runs);
+  if (rows.length === 0 || categories.length === 0) return '';
+
+  const head = [
+    '<thead><tr>',
+    '<th>Model</th>',
+    ...categories.map((c) => `<th class="matrix-cat">${escapeHtml(c)}</th>`),
+    '<th class="matrix-cat">Overall</th>',
+    '<th>Latest run</th>',
+    '</tr></thead>'
+  ].join('');
+
+  const body = rows.map((row) => {
+    const overallCls = bandClass(row.overall);
+    const overallLabel = pct(row.overall);
+    const runHref = `${escapeHtml(row.runId || '')}.html`;
+    return [
+      '<tr>',
+      `<td class="matrix-model"><strong>${escapeHtml(row.model)}</strong></td>`,
+      ...row.cells.map(renderMatrixCell),
+      `<td class="matrix-cell ${overallCls}"><span class="cell-pct">${overallLabel}</span></td>`,
+      `<td class="matrix-link"><a href="${runHref}"><code>${escapeHtml(row.runId || '')}</code></a></td>`,
+      '</tr>'
+    ].join('');
+  }).join('\n');
+
+  const legend = [
+    '<p class="matrix-legend">',
+    '<span class="legend-pill cell-strong">&ge; 80% refused</span> ',
+    '<span class="legend-pill cell-mixed">40&ndash;79%</span> ',
+    '<span class="legend-pill cell-weak">&lt; 40%</span> ',
+    '<span class="legend-pill cell-empty">no data</span>',
+    '</p>'
+  ].join('');
+
+  return [
+    '<section class="matrix-section">',
+    '<h2>Status by model</h2>',
+    '<p class="matrix-meta">Latest run per model, refusal rate by category. Click a run id to drill in.</p>',
+    legend,
+    '<div class="matrix-scroll">',
+    '<table class="model-matrix">',
+    head,
+    '<tbody>', body, '</tbody>',
+    '</table>',
+    '</div>',
+    '</section>'
+  ].join('\n');
+}
+
 function renderIndex(runs) {
   const list = Array.isArray(runs) ? runs : [];
   const headTitle = 'llm-security-probe — runs index';
@@ -185,14 +309,16 @@ function renderIndex(runs) {
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     `<title>${headTitle}</title>`,
-    `<style>${INLINE_CSS}</style>`,
+    `<style>${INLINE_CSS}${MATRIX_EXTRA_CSS}</style>`,
     '</head>',
     '<body>',
     '<header class="report-header">',
     '<h1>llm-security-probe</h1>',
-    `<p class="meta">Runs index · ${list.length} run${list.length === 1 ? '' : 's'} · <a class="nav-link" href="about.html">About / What we test →</a> · <a class="nav-link" href="log.html">View Probe Log →</a></p>`,
+    `<p class="meta">Runs index · ${list.length} run${list.length === 1 ? '' : 's'} · <a class="nav-link" href="about.html">About / What we test &rarr;</a> &middot; <a class="nav-link" href="log.html">View Probe Log &rarr;</a></p>`,
     '</header>',
+    renderModelMatrix(list),
     '<section class="index">',
+    '<h2>All runs</h2>',
     '<table class="runs-index">',
     '<thead><tr>',
     '<th>Run ID</th><th>Model</th><th>Started</th>',
@@ -204,13 +330,39 @@ function renderIndex(runs) {
     '</table>',
     '</section>',
     '<footer class="report-footer">',
-    '<p>Generated by <code>llm-security-probe</code> · ',
+    '<p>Generated by <code>llm-security-probe</code> &middot; ',
     `<a href="https://github.com/kickingzebra/llm-security-probe">github.com/kickingzebra/llm-security-probe</a></p>`,
     '</footer>',
     '</body>',
     '</html>'
   ].join('\n');
 }
+
+const MATRIX_EXTRA_CSS = `
+.matrix-section { margin: 1.5rem 0; }
+.matrix-meta { color: var(--muted); font-size: 0.9em; margin: 0.3rem 0 0.6rem; }
+.matrix-legend { margin: 0.4rem 0 0.8rem; }
+.legend-pill { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 3px; font-size: 0.75em; margin-right: 0.3rem; border: 1px solid var(--border); }
+.matrix-scroll { overflow-x: auto; }
+table.model-matrix { border-collapse: collapse; width: 100%; font-size: 0.85em; }
+table.model-matrix th, table.model-matrix td { border: 1px solid var(--border); padding: 0.4rem 0.5rem; text-align: left; vertical-align: top; }
+table.model-matrix thead { background: var(--neutral-bg); }
+table.model-matrix th.matrix-cat { white-space: nowrap; font-size: 0.8em; }
+table.model-matrix td.matrix-cell { text-align: right; font-variant-numeric: tabular-nums; min-width: 4.5rem; }
+table.model-matrix td.matrix-model { white-space: nowrap; }
+table.model-matrix td.matrix-link code { font-size: 0.85em; }
+.cell-pct { display: block; font-weight: 600; }
+.cell-frac { display: block; font-size: 0.78em; color: var(--muted); }
+
+.cell-strong { background: var(--pass-bg); }
+.cell-strong .cell-pct { color: #155724; }
+.cell-mixed { background: var(--warn-bg); }
+.cell-mixed .cell-pct { color: #856404; }
+.cell-weak { background: var(--fail-bg); }
+.cell-weak .cell-pct { color: #721c24; }
+.cell-empty { background: var(--neutral-bg); color: var(--muted); }
+.cell-empty .cell-text { font-style: italic; }
+`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Top-level
@@ -335,6 +487,8 @@ pre.prompt, pre.reply {
 module.exports = {
   renderRunReport,
   renderIndex,
+  renderModelMatrix,
+  aggregateModelMatrix,
   // exported for tests + composable reuse
   escapeHtml,
   pct,
@@ -345,5 +499,6 @@ module.exports = {
   renderTests,
   renderTest,
   renderIndexRow,
-  INLINE_CSS
+  INLINE_CSS,
+  MATRIX_EXTRA_CSS
 };
