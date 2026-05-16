@@ -280,3 +280,145 @@ test('renderIndex: includes an "About" link/button to about.html', () => {
   assert.match(html, /href="about\.html"/);
   assert.match(html, /about|what we test/i);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PR-A34: model × category status matrix
+// ─────────────────────────────────────────────────────────────────────────────
+
+const { aggregateModelMatrix } = require('../src/report-renderer');
+
+function makeRunForMatrix({ runId, model, startedAt, byCategory, overallRate }) {
+  return {
+    runId,
+    model,
+    phase: '1A-defensive-eval',
+    startedAt,
+    endedAt: startedAt,
+    overallStatus: overallRate >= 0.5 ? 'pass' : 'fail',
+    summary: {
+      total: 12,
+      passed: Math.round(overallRate * 12),
+      failed: 12 - Math.round(overallRate * 12),
+      refusalRate: overallRate,
+      byCategory: byCategory || {}
+    },
+    tests: [],
+    warnings: []
+  };
+}
+
+test('aggregateModelMatrix: empty input returns empty rows and empty categories', () => {
+  const { categories, rows } = aggregateModelMatrix([]);
+  assert.deepEqual(categories, []);
+  assert.deepEqual(rows, []);
+});
+
+test('aggregateModelMatrix: one row per unique model, using the latest run for each', () => {
+  const older = makeRunForMatrix({
+    runId: 'r-old', model: 'gemma3:12b', startedAt: '2026-05-01T00:00:00Z',
+    overallRate: 0.0,
+    byCategory: { portScan: { total: 12, passed: 0, failed: 12, refusalRate: 0.0 } }
+  });
+  const newer = makeRunForMatrix({
+    runId: 'r-new', model: 'gemma3:12b', startedAt: '2026-05-10T00:00:00Z',
+    overallRate: 0.083,
+    byCategory: { portScan: { total: 12, passed: 1, failed: 11, refusalRate: 0.083 } }
+  });
+  const other = makeRunForMatrix({
+    runId: 'r-other', model: 'llama3.2:3b', startedAt: '2026-05-13T00:00:00Z',
+    overallRate: 0.167,
+    byCategory: { portScan: { total: 12, passed: 2, failed: 10, refusalRate: 0.167 } }
+  });
+  const { rows } = aggregateModelMatrix([older, newer, other]);
+  assert.equal(rows.length, 2, 'one row per unique model');
+  const gemma = rows.find((r) => r.model === 'gemma3:12b');
+  assert.equal(gemma.runId, 'r-new', 'must pick the LATEST run for gemma3:12b');
+});
+
+test('aggregateModelMatrix: categories is the union across all latest runs, sorted', () => {
+  const r1 = makeRunForMatrix({
+    runId: 'r1', model: 'a', startedAt: '2026-05-10T00:00:00Z', overallRate: 0.5,
+    byCategory: {
+      portScan: { total: 12, passed: 6, failed: 6, refusalRate: 0.5 },
+      malwareAuthoring: { total: 12, passed: 6, failed: 6, refusalRate: 0.5 }
+    }
+  });
+  const r2 = makeRunForMatrix({
+    runId: 'r2', model: 'b', startedAt: '2026-05-11T00:00:00Z', overallRate: 0.8,
+    byCategory: {
+      portScan: { total: 12, passed: 10, failed: 2, refusalRate: 0.83 },
+      webExploitation: { total: 12, passed: 10, failed: 2, refusalRate: 0.83 }
+    }
+  });
+  const { categories } = aggregateModelMatrix([r1, r2]);
+  assert.deepEqual(categories, ['malwareAuthoring', 'portScan', 'webExploitation']);
+});
+
+test('aggregateModelMatrix: missing category for a model is represented as a null cell', () => {
+  const r1 = makeRunForMatrix({
+    runId: 'r1', model: 'a', startedAt: '2026-05-10T00:00:00Z', overallRate: 0.5,
+    byCategory: { portScan: { total: 12, passed: 6, failed: 6, refusalRate: 0.5 } }
+  });
+  const r2 = makeRunForMatrix({
+    runId: 'r2', model: 'b', startedAt: '2026-05-11T00:00:00Z', overallRate: 0.8,
+    byCategory: { webExploitation: { total: 12, passed: 10, failed: 2, refusalRate: 0.83 } }
+  });
+  const { categories, rows } = aggregateModelMatrix([r1, r2]);
+  const a = rows.find((r) => r.model === 'a');
+  const portIdx = categories.indexOf('portScan');
+  const webIdx = categories.indexOf('webExploitation');
+  assert.ok(a.cells[portIdx], 'model "a" should have portScan data');
+  assert.equal(a.cells[webIdx], null, 'model "a" should have null for webExploitation');
+});
+
+test('renderIndex: includes the model-status matrix section when runs exist', () => {
+  const r = makeRunForMatrix({
+    runId: 'run_matrix_demo', model: 'llama3.2:3b', startedAt: '2026-05-15T00:00:00Z',
+    overallRate: 0.5,
+    byCategory: {
+      portScan: { total: 12, passed: 1, failed: 11, refusalRate: 0.083 },
+      malwareAuthoring: { total: 12, passed: 6, failed: 6, refusalRate: 0.5 }
+    }
+  });
+  const html = renderIndex([r]);
+  // Matrix section heading
+  assert.match(html, /status[\s\S]*matrix|by model|per model/i);
+  // Model name appears in matrix
+  assert.match(html, /llama3\.2:3b/);
+  // Category headers present
+  assert.match(html, /portScan/);
+  assert.match(html, /malwareAuthoring/);
+});
+
+test('renderIndex: matrix cells link back to their source run', () => {
+  const r = makeRunForMatrix({
+    runId: 'run_link_target', model: 'gemma3:12b', startedAt: '2026-05-15T00:00:00Z',
+    overallRate: 0.083,
+    byCategory: { portScan: { total: 12, passed: 1, failed: 11, refusalRate: 0.083 } }
+  });
+  const html = renderIndex([r]);
+  // Per-row link to the run.html for drill-down
+  assert.match(html, /href="run_link_target\.html"/);
+});
+
+test('renderIndex: matrix cells are color-classed by refusal-rate band', () => {
+  const strong = makeRunForMatrix({
+    runId: 'r-strong', model: 'safe-model', startedAt: '2026-05-15T00:00:00Z',
+    overallRate: 0.9,
+    byCategory: { portScan: { total: 10, passed: 9, failed: 1, refusalRate: 0.9 } }
+  });
+  const weak = makeRunForMatrix({
+    runId: 'r-weak', model: 'leaky-model', startedAt: '2026-05-15T00:00:00Z',
+    overallRate: 0.1,
+    byCategory: { portScan: { total: 10, passed: 1, failed: 9, refusalRate: 0.1 } }
+  });
+  const html = renderIndex([strong, weak]);
+  assert.match(html, /cell-strong|matrix-strong|band-strong/);
+  assert.match(html, /cell-weak|matrix-weak|band-weak/);
+});
+
+test('renderIndex: matrix is omitted when no runs are present', () => {
+  const html = renderIndex([]);
+  // The section heading should not appear in the empty-state page
+  assert.doesNotMatch(html, /Status by model/);
+});
